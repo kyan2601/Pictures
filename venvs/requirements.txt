@@ -1,0 +1,7 @@
+exif
+ffmpeg-python
+geopy
+pandas
+pillow
+pillow_heif
+prettytable

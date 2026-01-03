@@ -1,0 +1,36 @@
+import os
+from datetime import datetime
+
+import ffmpeg
+
+from src import constants, helper
+from src.classes.VideoEntry import VideoEntry
+
+
+class MP4VideoEntry(VideoEntry):
+
+    def __init__(self, filepath):
+        super().__init__(filepath)
+        self.ext = constants.VideoExtension.MP4
+
+    def _extract_metadata(self):
+        data = ffmpeg.probe(self.filepath)
+
+        # extract video and audio streams
+        video_metadata = None
+        audio_metadata = None
+        for stream_metadata in data['streams']:
+            codec_type = stream_metadata['codec_type']
+            if codec_type == 'video':
+                video_metadata = stream_metadata
+            elif codec_type == 'audio':
+                audio_metadata = stream_metadata
+
+        self.dt = helper.try_except(lambda: datetime.fromisoformat(data['format']['tags']['creation_time']),
+                                    datetime.fromtimestamp(os.path.getctime(self.filepath)))
+        self.width = helper.try_except(lambda: video_metadata['width'], None)
+        self.height = helper.try_except(lambda: video_metadata['height'], None)
+        self.latitude, self.longitude, self.altitude = helper.try_except(
+            lambda: helper.lat_long_parser(data['format']['tags']['location']),
+            (None, None, None))
+        self.duration = helper.try_except(lambda: float(data['format']['duration']), None)
