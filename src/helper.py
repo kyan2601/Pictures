@@ -15,9 +15,17 @@ from src import constants
 
 
 def try_except(success, failure, *exceptions):
+    """
+    Try to execute success(), return failure() or failure value on exception.
+    
+    Args:
+        success: Callable to execute
+        failure: Callable to execute on exception, or value to return
+        *exceptions: Exception types to catch (defaults to Exception if none provided)
+    """
     try:
         return success()
-    except exceptions or Exception:
+    except exceptions if exceptions else Exception:
         return failure() if callable(failure) else failure
 
 
@@ -27,6 +35,15 @@ def try_except(success, failure, *exceptions):
 
 
 def keyword_is_name(keyword):
+    """
+    Check if a keyword matches the pattern of a person's name (e.g., "JohnSmith").
+    
+    Args:
+        keyword: String to check
+        
+    Returns:
+        bool: True if keyword matches name pattern
+    """
     return bool(re.match("[A-Z][a-z]+[A-Z][a-z]+", keyword))
 
 
@@ -36,6 +53,16 @@ def keyword_is_name(keyword):
 
 
 def get_filepaths_by_directory(directory=constants.ROOT_DIR, ignore_new_media=True) -> list[str]:
+    """
+    Get all media file paths from a directory recursively.
+    
+    Args:
+        directory: Directory to search (defaults to ROOT_DIR)
+        ignore_new_media: If True, exclude files from NEW_MEDIA_DIR
+        
+    Returns:
+        list[str]: Sorted list of unique file paths
+    """
     filepaths = []
 
     for ext in constants.MEDIA_EXTENSIONS:
@@ -48,6 +75,15 @@ def get_filepaths_by_directory(directory=constants.ROOT_DIR, ignore_new_media=Tr
 
 
 def decompose_filepath(filepath):
+    """
+    Decompose a filepath into its components.
+    
+    Args:
+        filepath: Full file path
+        
+    Returns:
+        dict: Dictionary with 'dirname', 'filename', 'filename_without_ext', 'ext'
+    """
     dirname = os.path.dirname(filepath)
     filename = os.path.basename(filepath)
     filename_without_ext, ext = filename.rsplit('.', 1)
@@ -61,6 +97,15 @@ def decompose_filepath(filepath):
 
 
 def decompose_filename(filename):
+    """
+    Decompose a media filename following the naming convention [yymmdd][img_num]_[title].[ext].
+    
+    Args:
+        filename: Filename to decompose (e.g., "240207001_Christmas_Party.jpeg")
+        
+    Returns:
+        dict: Dictionary with 'date', 'date_obj', 'media_index', 'title', 'title_clean', 'ext'
+    """
     filename_without_ext, ext = filename.rsplit('.', 1)
     date = filename_without_ext[:6]
     dt = datetime.strptime('20' + date, '%Y%m%d').date()
@@ -116,10 +161,30 @@ def get_directory_for_year_month(year, month):
 #####################################
 
 def serialize_filepath(filepath, delimiter='|/'):
+    """
+    Serialize a filepath for storage in CSV (replaces path separators with delimiter).
+    
+    Args:
+        filepath: Full file path
+        delimiter: Delimiter to use (default: '|/')
+        
+    Returns:
+        str: Serialized filepath
+    """
     return delimiter.join(filepath.replace(constants.ROOT_DIR, '').strip(os.sep).split(os.sep))
 
 
 def deserialize_filepath(filepath, delimiter='|/'):
+    """
+    Deserialize a filepath from CSV format back to full path.
+    
+    Args:
+        filepath: Serialized filepath
+        delimiter: Delimiter used in serialization (default: '|/')
+        
+    Returns:
+        str: Full file path
+    """
     return os.sep.join([constants.ROOT_DIR] + filepath.split(delimiter))
 
 

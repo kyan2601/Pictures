@@ -11,6 +11,18 @@ class MediaEntry(ABC):
         self.filepath = filepath
         self.dt = None
         self.metadata_file: MetadataFile | None = None
+        # Initialize all metadata fields to None
+        self.width = None
+        self.height = None
+        self.latitude = None
+        self.longitude = None
+        self.altitude = None
+        self.orientation = None
+        self.title = None
+        self.tags = None
+        self.people = None
+        self.comments = None
+        self.event_id = None
         self.load()
 
     def _get_metadata_file(self):

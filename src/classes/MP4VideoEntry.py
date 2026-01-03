@@ -26,11 +26,18 @@ class MP4VideoEntry(VideoEntry):
             elif codec_type == 'audio':
                 audio_metadata = stream_metadata
 
-        self.dt = helper.try_except(lambda: datetime.fromisoformat(data['format']['tags']['creation_time']),
-                                    datetime.fromtimestamp(os.path.getctime(self.filepath)))
-        self.width = helper.try_except(lambda: video_metadata['width'], None)
-        self.height = helper.try_except(lambda: video_metadata['height'], None)
+        if video_metadata is None:
+            raise RuntimeError(f"No video stream found in {self.filepath}")
+
+        self.dt = helper.try_except(
+            lambda: datetime.fromisoformat(data['format']['tags']['creation_time']),
+            datetime.fromtimestamp(os.path.getctime(self.filepath))
+        )
+        self.width = helper.try_except(lambda: int(video_metadata['width']), None)
+        self.height = helper.try_except(lambda: int(video_metadata['height']), None)
         self.latitude, self.longitude, self.altitude = helper.try_except(
             lambda: helper.lat_long_parser(data['format']['tags']['location']),
             (None, None, None))
-        self.duration = helper.try_except(lambda: float(data['format']['duration']), None)
+        # Note: duration is extracted but not stored in metadata.csv as it's not in METADATA_COLS
+        # If needed in the future, add it to constants.METADATA_COLS
+        _duration = helper.try_except(lambda: float(data['format']['duration']), None)

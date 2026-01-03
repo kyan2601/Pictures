@@ -22,31 +22,36 @@ def _calculate_next_event_index(year, month):
 
 
 class EventsMetadataFile:
-    _instance = None
+    _instances = {}
 
     def __init__(self):
-        if EventsMetadataFile._instance:
-            raise Exception("EventsMetadataFile is a singleton class, please call static method get_instance() instead")
+        if EventsMetadataFile._get_key() in EventsMetadataFile._instances.keys():
+            raise RuntimeError("EventsMetadataFile is a singleton class, please call static method get_instance() instead")
 
         self.filepath = constants.EVENTS_FILEPATH
         self.df = None
         self.load()
 
     @staticmethod
+    def _get_key():
+        return "events"
+
+    @staticmethod
     def get_instance():
-        if not EventsMetadataFile._instance:
-            EventsMetadataFile._instance = EventsMetadataFile()
-        return EventsMetadataFile._instance
+        key = EventsMetadataFile._get_key()
+        if key not in EventsMetadataFile._instances.keys():
+            EventsMetadataFile._instances[key] = EventsMetadataFile()
+        return EventsMetadataFile._instances[key]
 
     def load(self):
         if not os.path.exists(self.filepath):
-            raise Exception("ERROR: Events metadata file does not exist! Please investigate.")
+            raise RuntimeError("ERROR: Events metadata file does not exist! Please investigate.")
 
         self.df = pd.read_csv(self.filepath)
 
     def write(self):
         if self.df is None:
-            raise Exception(f"Tried to write out events metadata file but dataframe is None")
+            raise RuntimeError(f"Tried to write out events metadata file but dataframe is None")
 
         self.df = self.df[constants.EVENTS_COLS]
         self.df.to_csv(self.filepath, index=False)

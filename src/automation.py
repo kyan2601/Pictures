@@ -28,38 +28,41 @@ def identify_live_photo_movies(remove=False, verbose=True):
         print(pt)
 
     grouped_filenames = {}
-    for filename in media_filepaths:
-        fname, ext = filename.rsplit('.', 1)
+    for filepath in media_filepaths:
+        fname, ext = filepath.rsplit('.', 1)
         if fname not in grouped_filenames:
             grouped_filenames[fname] = {
                 'picture_extensions': [],
                 'video_extensions': [],
             }
-        if ext in constants.PICTURE_EXTENSIONS:
-            grouped_filenames[fname]['picture_extensions'].append(ext)
-        elif ext in constants.VIDEO_EXTENSIONS:
-            grouped_filenames[fname]['video_extensions'].append(ext)
+        if ext.lower() in constants.PICTURE_EXTENSIONS:
+            grouped_filenames[fname]['picture_extensions'].append(ext.lower())
+        elif ext.lower() in constants.VIDEO_EXTENSIONS:
+            grouped_filenames[fname]['video_extensions'].append(ext.lower())
         else:
-            raise ValueError(f"[!!!] Unknown extension {ext} in {filename}")
+            raise ValueError(f"[!!!] Unknown extension {ext} in {filepath}")
 
     live_photos = []
-    for filename in grouped_filenames.keys():
-        if grouped_filenames[filename]['picture_extensions'] and \
-                (constants.VideoExtension.MOV.name in grouped_filenames[filename]['video_extensions'] or
-                 constants.VideoExtension.MOV.value in grouped_filenames[filename]['video_extensions']):
+    for base_filepath in grouped_filenames.keys():
+        if grouped_filenames[base_filepath]['picture_extensions'] and \
+                (constants.VideoExtension.MOV.name.lower() in grouped_filenames[base_filepath]['video_extensions'] or
+                 constants.VideoExtension.MOV.value.lower() in grouped_filenames[base_filepath]['video_extensions']):
             # live photo identified; image file is accompanied by an .mov
-            live_photos.append(filename)
+            live_photos.append(base_filepath)
 
     if verbose:
         print("[-] Found {} live photos".format(len(live_photos)))
-        print(live_photos)
 
     if remove:
-        for filename in live_photos:
-            ext = constants.VideoExtension.MOV.name \
-                    if constants.VideoExtension.MOV.name in grouped_filenames[filename]['video_extensions'] \
-                    else constants.VideoExtension.MOV.value
-            os.remove(filename + f'.{ext}')
+        for base_filepath in live_photos:
+            ext = constants.VideoExtension.MOV.name.lower() \
+                    if constants.VideoExtension.MOV.name.lower() in grouped_filenames[base_filepath]['video_extensions'] \
+                    else constants.VideoExtension.MOV.value.lower()
+            mov_filepath = f'{base_filepath}.{ext}'
+            if os.path.exists(mov_filepath):
+                os.remove(mov_filepath)
+                if verbose:
+                    print(f'[-] Removed live photo movie: {mov_filepath}')
 
     if verbose:
         print(f'[*] Finished removing {len(live_photos)} live photo movies!')
@@ -99,7 +102,10 @@ def sort_and_rename_new_pictures(verbose=True):
         idx += len(existing_files)
 
         for media_obj in date_media:
-            new_filepath = os.path.join(path_dir, date.strftime('%y%m%d') + str(idx).zfill(3)) + '.' + media_obj.ext.name
+            new_filepath = os.path.join(
+                path_dir, 
+                date.strftime('%y%m%d') + str(idx).zfill(3) + '.' + media_obj.ext.value
+            )
             if verbose:
                 print(f'[-] Moving {media_obj.filepath} to {new_filepath}')
             media_obj.move(new_filepath)

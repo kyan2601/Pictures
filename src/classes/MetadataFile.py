@@ -34,6 +34,9 @@ class MetadataFile:
         # try to keep this minimal
         self.df['filepath'] = self.df['filepath'].apply(lambda x: helper.deserialize_filepath(x))
         self.df['dt'] = pd.to_datetime(self.df['dt'])
+        # Convert pd.NA/NaN back to None for consistency with Python objects
+        # This ensures MediaEntry objects have None instead of pd.NA when loading from CSV
+        self.df = self.df.where(pd.notna(self.df), None)
 
     def load(self):
         if not os.path.exists(self.filepath):
@@ -51,6 +54,8 @@ class MetadataFile:
         df = self.df.copy()
         df['filepath'] = df['filepath'].apply(lambda x: helper.serialize_filepath(x))
         df = df[constants.METADATA_COLS]
+        # Convert None values to pd.NA so CSV writes empty cells instead of "None"
+        df = df.replace({None: pd.NA})
         return df
 
     def write(self):
@@ -71,21 +76,21 @@ class MetadataFile:
     def add_media_metadata(self, metadata: dict | list, update=False, write=True):
         if update:
             # default to new metadata so remove "stale" records
-            if type(metadata) is dict:
+            if isinstance(metadata, dict):
                 self.df = self.df[self.df['filepath'] != metadata['filepath']]
-            elif type(metadata) is list:
+            elif isinstance(metadata, list):
                 remove_df = pd.DataFrame(metadata, columns=constants.METADATA_COLS)
-                self.df = self.df[self.df['filepath'].notin(remove_df['filepath'])]
+                self.df = self.df[~self.df['filepath'].isin(remove_df['filepath'])]
 
         additional_df = pd.DataFrame([], columns=constants.METADATA_COLS)
-        if type(metadata) is dict:
+        if isinstance(metadata, dict):
             if 'filepath' not in metadata:
                 raise RuntimeError(f"Could not add [{metadata}] to {self}")
             if self.has_media_metadata(metadata['filepath']):
                 raise RuntimeError(
                     f"Filepath [{metadata['filepath']}] already exists in {self} during add. Please make sure update=True if you want this change to override existing metadata.")
             additional_df = pd.DataFrame([metadata], columns=constants.METADATA_COLS)
-        elif type(metadata) is list:
+        elif isinstance(metadata, list):
             additional_df = pd.DataFrame(metadata, columns=constants.METADATA_COLS)
             if additional_df['filepath'].isnull().any():
                 raise RuntimeError(f"Could not add [{metadata}] to {self}")
