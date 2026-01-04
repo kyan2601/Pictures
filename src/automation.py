@@ -56,8 +56,8 @@ def identify_live_photo_movies(remove=False, verbose=True):
     if remove:
         for base_filepath in live_photos:
             ext = constants.VideoExtension.MOV.name.lower() \
-                    if constants.VideoExtension.MOV.name.lower() in grouped_filenames[base_filepath]['video_extensions'] \
-                    else constants.VideoExtension.MOV.value.lower()
+                if constants.VideoExtension.MOV.name.lower() in grouped_filenames[base_filepath]['video_extensions'] \
+                else constants.VideoExtension.MOV.value.lower()
             mov_filepath = f'{base_filepath}.{ext}'
             if os.path.exists(mov_filepath):
                 os.remove(mov_filepath)
@@ -77,7 +77,7 @@ def sort_and_rename_new_pictures(verbose=True):
 
     if verbose:
         print('[-] Found {} files to sort'.format(len(media_filepaths)))
-        
+
     media = [media_class_controller.create_media_entry(fp) for fp in media_filepaths]
 
     # organize by date
@@ -103,7 +103,7 @@ def sort_and_rename_new_pictures(verbose=True):
 
         for media_obj in date_media:
             new_filepath = os.path.join(
-                path_dir, 
+                path_dir,
                 date.strftime('%y%m%d') + str(idx).zfill(3) + '.' + media_obj.ext.value
             )
             if verbose:
@@ -144,7 +144,9 @@ def index_metadata_for_year(year):
     year_dir = helper.get_directory_for_year(year)
 
     if os.path.exists(os.path.join(year_dir, constants.METADATA_FILENAME)):
-        print(f"[!!!] WARNING: Metadata file already exists for year {year}. If completely re-indexing, please manually delete file first.")
+        print(
+            f"[!!!] WARNING: Metadata file already exists for year {year}." +
+            " If completely re-indexing, please manually delete file first.")
         return
 
     filepaths = helper.get_filepaths_by_directory(year_dir)
