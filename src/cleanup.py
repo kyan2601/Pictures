@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-import shutil
 
 from src import constants, helper
 from src.classes.MetadataFile import MetadataFile
@@ -20,7 +19,6 @@ def identify_overlapping_filenames(metadata_file: MetadataFile) -> bool:
     metadata_agg = metadata_agg.sort_values(by=['count', 'filename_without_ext'], ascending=False)
 
     if len(metadata_agg) > 0:
-        check_flag = False
         print("[!!!] WARNING: Found {} overlapping filenames:".format(len(metadata_agg)))
         print(metadata_agg)
         raise RuntimeError("[!!!] ACTION REQUIRED!")
@@ -30,7 +28,7 @@ def identify_overlapping_filenames(metadata_file: MetadataFile) -> bool:
     return check_flag
 
 
-def check_for_deleted_media(metadata_file: MetadataFile) -> bool:
+def check_for_deleted_media(metadata_file: MetadataFile, dry_run=False) -> bool:
     print(f"[*] Searching for removed media to clean from metadata [{metadata_file.year}]...")
     check_flag = True
 
@@ -48,8 +46,13 @@ def check_for_deleted_media(metadata_file: MetadataFile) -> bool:
         return check_flag
 
     check_flag = False
-
     metadata_deleted = metadata[~metadata['filepath'].isin(filepaths)]
+
+    if dry_run:
+        print(f"[!] DRY RUN: Would move {len(metadata_deleted)} records to {constants.METADATA_DELETED_FILENAME}")
+        print(f"[!] DRY RUN: Would reduce the metadata file from {original_size} to {final_size} rows")
+        return check_flag
+
     deleted_metadata_filepath = os.path.join(helper.get_directory_for_year(metadata_file.year),
                                              constants.METADATA_DELETED_FILENAME)
 
@@ -117,7 +120,6 @@ def check_for_mismatching_filename_and_datetime(metadata_file: MetadataFile) -> 
     metadata = metadata[~metadata['check']]
 
     if len(metadata) > 0:
-        check_flag = False
         print("[!!!] WARNING: Found {} mismatched filenames and datetimes:".format(len(metadata)))
         print(metadata)
         raise RuntimeError("[!!!] ACTION REQUIRED!")
@@ -127,7 +129,7 @@ def check_for_mismatching_filename_and_datetime(metadata_file: MetadataFile) -> 
     return check_flag
 
 
-def reorder_media_by_datetime(metadata_file: MetadataFile) -> bool:
+def reorder_media_by_datetime(metadata_file: MetadataFile, dry_run=False) -> bool:
     print(f"[*] Searching for out of order media in year [{metadata_file.year}]...")
     check_flag = True
 
@@ -172,15 +174,20 @@ def reorder_media_by_datetime(metadata_file: MetadataFile) -> bool:
         lambda x: _helper_reconstruct_filepath(x['filepath'], x['dt_index']), axis=1)
 
     path_map = dict(zip(records_to_change['filepath'], records_to_change['new_filepath']))
-    
+
     # Pre-flight check for collisions with files not in the transaction
     source_paths = set(path_map.keys())
     for old_path, new_path in path_map.items():
         if os.path.exists(new_path) and new_path not in source_paths:
-            raise RuntimeError(f"[!!!] Aborting reorder: planned rename would overwrite an existing file that is not part of the reorder batch. File: {new_path}")
-            
+            raise RuntimeError(
+                f"[!!!] Aborting reorder: planned rename would overwrite an existing file that is not part of the reorder batch. File: {new_path}")
+
     print("[-] Making the following changes:")
     print(records_to_change[['filepath', 'new_filepath']])
+
+    if dry_run:
+        print(f"[!] DRY RUN: Would rename {len(path_map)} files.")
+        return check_flag
 
     tmp_map = {}
     renamed_to_final_map = {}
@@ -216,12 +223,12 @@ def reorder_media_by_datetime(metadata_file: MetadataFile) -> bool:
         # --- ROLLBACK ---
         print(f"\n[!!!] ERROR: An error occurred during reordering: {e}")
         print("[!!!] Rolling back changes...")
-        
+
         # Rollback phase 2 (rename final to temporary)
         for tmp_path, new_path in renamed_to_final_map.items():
             if os.path.exists(new_path):
                 os.rename(new_path, tmp_path)
-                
+
         # Rollback phase 1 (rename temporary to original)
         for old_path, tmp_path in tmp_map.items():
             if os.path.exists(tmp_path):
@@ -230,21 +237,24 @@ def reorder_media_by_datetime(metadata_file: MetadataFile) -> bool:
         # Reload the original metadata to discard in-memory changes
         metadata_file.load()
         print(f"[!!!]  - Rolled back all file renames and metadata changes.")
-        
+
         print("[!!!] Rollback complete.")
         raise
 
 
-def clean_up_metadata(year):
+def clean_up_metadata(year, dry_run=True):
     print(f"[*] Initiating metadata cleanup checks for year [{year}]")
+    if dry_run:
+        print("[!] Running in DRY RUN mode. No changes will be made.")
+
     metadata_file = MetadataFile.get_instance(year)
     check_flag = True
 
     check_flag &= identify_overlapping_filenames(metadata_file)
-    check_flag &= check_for_deleted_media(metadata_file)
+    check_flag &= check_for_deleted_media(metadata_file, dry_run=dry_run)
     check_flag &= check_for_unexpected_NAs(metadata_file)
     check_flag &= check_for_mismatching_filename_and_datetime(metadata_file)
-    check_flag &= reorder_media_by_datetime(metadata_file)
+    check_flag &= reorder_media_by_datetime(metadata_file, dry_run=dry_run)
 
     print('--------------------------------------------------------------------------------------------')
     if check_flag:
@@ -261,12 +271,14 @@ def clean_up_metadata(year):
 
 
 def main():
+    # years_to_check = sorted([int(d) for d in os.listdir(constants.ROOT_DIR) if
+    #                          d.isdigit() and os.path.isdir(os.path.join(constants.ROOT_DIR, d))])
     years_to_check = [
-        2014
+        2015,
     ]
 
     for year in years_to_check:
-        check_flag = clean_up_metadata(year)
+        check_flag = clean_up_metadata(year, dry_run=True)
         if not check_flag:
             break
 
