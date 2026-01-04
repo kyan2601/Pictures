@@ -8,7 +8,7 @@ NEW_MEDIA_DIR = os.path.join(ROOT_DIR, 'new')
 METADATA_FILENAME = 'metadata.csv'
 METADATA_COLS = ['filepath', 'dt', 'width', 'height',
                  'latitude', 'longitude', 'altitude', 'orientation',
-                 'title', 'tags', 'people', 'comments', 'event_id']
+                 'title', 'tags', 'people', 'comments', 'event_id', 'is_highlight']
 
 EVENTS_FILEPATH = os.path.join(SOURCE_DIR, 'events.csv')
 EVENTS_COLS = ['event_id', 'event_index',

@@ -23,6 +23,7 @@ class MediaEntry(ABC):
         self.people = None
         self.comments = None
         self.event_id = None
+        self.is_highlight = 0
         self.load()
 
     def _get_metadata_file(self):
