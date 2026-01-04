@@ -73,3 +73,4 @@ Notes:
 - Responses are slow, significantly. Not sure if this is because free version only has Gemini 2.5.
 - Requests user approval for each change, nice!
 - Very good explanations for each step of the implementation.
+- Apparently Gemini 2.5 has a pro version. Gemini nicely rolls back to gemini-2.5-flash when usage limit is exceeded.
