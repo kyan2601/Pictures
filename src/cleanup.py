@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import shutil
 
 from src import constants, helper
 from src.classes.MetadataFile import MetadataFile
@@ -146,7 +147,8 @@ def reorder_media_by_datetime(metadata_file: MetadataFile) -> bool:
     metadata['dt_index'] = metadata.sort_values(by=['filename_date', 'dt']).groupby(by='filename_date').cumcount() + 1
 
     # find dates with discrepancies
-    dates_with_issues = list(metadata[metadata['media_index'] != metadata['dt_index']]['filename_date'].unique())
+    records_to_change = metadata[metadata['media_index'] != metadata['dt_index']].copy()
+    dates_with_issues = list(records_to_change['filename_date'].unique())
     dates_with_issues = sorted([date.strftime('%Y-%m-%d') for date in dates_with_issues])
 
     if len(dates_with_issues) == 0:
@@ -166,36 +168,71 @@ def reorder_media_by_datetime(metadata_file: MetadataFile) -> bool:
         new_filename = f"{decomposed_filename['date']}{str(new_index).zfill(3)}{'_' + decomposed_filename['title'] if decomposed_filename['title'] else ''}.{decomposed_filename['ext']}"
         return os.path.join(dirname, new_filename)
 
-    metadata['new_filepath'] = metadata.apply(
+    records_to_change['new_filepath'] = records_to_change.apply(
         lambda x: _helper_reconstruct_filepath(x['filepath'], x['dt_index']), axis=1)
 
-    def _helper_construct_temp_filepath(filepath):
-        decomposed_filepath = helper.decompose_filepath(filepath)
-        dirname = decomposed_filepath['dirname']
-        filename = decomposed_filepath['filename']
-        return os.path.join(dirname, 'tmp_' + filename)
-
-    metadata['tmp_filepath'] = metadata['filepath'].apply(lambda x: _helper_construct_temp_filepath(x))
-
+    path_map = dict(zip(records_to_change['filepath'], records_to_change['new_filepath']))
+    
+    # Pre-flight check for collisions with files not in the transaction
+    source_paths = set(path_map.keys())
+    for old_path, new_path in path_map.items():
+        if os.path.exists(new_path) and new_path not in source_paths:
+            raise RuntimeError(f"[!!!] Aborting reorder: planned rename would overwrite an existing file that is not part of the reorder batch. File: {new_path}")
+            
     print("[-] Making the following changes:")
-    records_to_change = metadata[metadata['media_index'] != metadata['dt_index']]
     print(records_to_change[['filepath', 'new_filepath']])
 
-    # temporary rename to avoid collisions
-    for _, row in records_to_change.iterrows():
-        os.rename(row['filepath'], row['tmp_filepath'])
+    tmp_map = {}
+    renamed_to_final_map = {}
+    try:
+        # --- PHASE 1: RENAME TO TEMPORARY ---
+        print("[-] Phase 1/3: Renaming files to temporary names...")
+        for old_path, new_path in path_map.items():
+            tmp_path = old_path + ".tmp_reorder"
+            os.rename(old_path, tmp_path)
+            tmp_map[old_path] = tmp_path
+        print(f"[-]  - Renamed {len(tmp_map)} files to temporary names.")
 
-    # final renames
-    for _, row in records_to_change.iterrows():
-        os.rename(row['tmp_filepath'], row['new_filepath'])
+        # --- PHASE 2: RENAME TO FINAL ---
+        print("[-] Phase 2/3: Renaming temporary files to final names...")
+        for old_path, tmp_path in tmp_map.items():
+            new_path = path_map[old_path]
+            os.rename(tmp_path, new_path)
+            renamed_to_final_map[tmp_path] = new_path
+        print(f"[-]  - Renamed {len(renamed_to_final_map)} files to their final names.")
 
-    # update metadata file
-    metadata['filepath'] = metadata['new_filepath']
-    metadata_file.df = metadata[constants.METADATA_COLS]
-    metadata_file.write()
+        # --- PHASE 3: METADATA UPDATE ---
+        print("[-] Phase 3/3: Updating metadata file...")
+        new_filepaths = metadata['filepath'].map(path_map).fillna(metadata['filepath'])
+        metadata['filepath'] = new_filepaths
+        metadata_file.df = metadata[constants.METADATA_COLS]
+        metadata_file.write()
+        print("[-]  - Metadata file updated successfully.")
 
-    print(f"[*] Finished reordering media for {len(dates_with_issues)} dates!")
-    return check_flag
+        print(f"[*] Finished reordering media for {len(dates_with_issues)} dates!")
+        return check_flag
+
+    except Exception as e:
+        # --- ROLLBACK ---
+        print(f"\n[!!!] ERROR: An error occurred during reordering: {e}")
+        print("[!!!] Rolling back changes...")
+        
+        # Rollback phase 2 (rename final to temporary)
+        for tmp_path, new_path in renamed_to_final_map.items():
+            if os.path.exists(new_path):
+                os.rename(new_path, tmp_path)
+                
+        # Rollback phase 1 (rename temporary to original)
+        for old_path, tmp_path in tmp_map.items():
+            if os.path.exists(tmp_path):
+                os.rename(tmp_path, old_path)
+
+        # Reload the original metadata to discard in-memory changes
+        metadata_file.load()
+        print(f"[!!!]  - Rolled back all file renames and metadata changes.")
+        
+        print("[!!!] Rollback complete.")
+        raise
 
 
 def clean_up_metadata(year):
@@ -225,7 +262,7 @@ def clean_up_metadata(year):
 
 def main():
     years_to_check = [
-        2015
+        2014
     ]
 
     for year in years_to_check:

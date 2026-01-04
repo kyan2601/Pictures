@@ -69,6 +69,7 @@ Notes:
 Docs: https://geminicli.com/docs/get-started/deployment/
 
 Notes:
-- Long requests seem to cut off at some point
+- Long requests seem to cut off at some point.
 - Responses are slow, significantly. Not sure if this is because free version only has Gemini 2.5.
 - Requests user approval for each change, nice!
+- Very good explanations for each step of the implementation.
