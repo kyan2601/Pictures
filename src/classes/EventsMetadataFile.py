@@ -82,7 +82,7 @@ class EventsMetadataFile:
         event_id = 1
         if len(self.df) > 0:
             event_id = self.df['event_id'].max() + 1
-        return event_id
+        return int(event_id)
 
     def create_event(self, title, start_date, end_date,
                      description=None, nominal_month=None) -> EventEntry:
@@ -123,7 +123,7 @@ class EventsMetadataFile:
         event_id = self._next_event_id()
         event_index = _calculate_next_event_index(start_date_dt.strftime('%Y'), start_date_dt.strftime('%m'))
         event = EventEntry(event_id, event_index, start_date_dt, end_date_dt, title, description, nominal_month)
-        print(f"[-] Event plan created with ID: {event.id}")
+        print(f"[-] Event plan created with ID: {event.event_id}")
 
         if all_media_df.empty:
             print("[!] No media found in date range. Creating event entry only.")
@@ -156,28 +156,42 @@ class EventsMetadataFile:
 
             # --- METADATA UPDATE PHASE ---
             print("[-] Updating metadata files...")
+            
+            # Prepare a dataframe of all the new metadata rows
             new_metadata_df = all_media_df.copy()
             new_metadata_df['filepath'] = new_metadata_df['filepath'].map(path_map)
-            new_metadata_df['event_id'] = event.id
-            
-            media_by_year = defaultdict(list)
+            new_metadata_df['event_id'] = event.event_id
+
+            # --- 1. REMOVE OLD METADATA ---
+            # Group media by their original year to know which files to read/remove from.
+            media_by_original_year = defaultdict(list)
             for original_path in path_map.keys():
                 year = helper.get_year_from_filepath(original_path)
-                media_by_year[year].append(original_path)
+                media_by_original_year[year].append(original_path)
 
-            for year, original_paths_in_year in media_by_year.items():
+            print("[-] Removing old metadata entries...")
+            for year, original_paths_in_year in media_by_original_year.items():
                 mf = MetadataFile.get_instance(year)
                 
-                # Remove old rows
+                original_count = len(mf.df)
                 mf.df = mf.df[~mf.df['filepath'].isin(original_paths_in_year)]
-                
-                # Add new rows for this year
-                new_filepaths_in_year = [path_map[p] for p in original_paths_in_year]
-                new_rows_for_year = new_metadata_df[new_metadata_df['filepath'].isin(new_filepaths_in_year)]
-                mf.df = pd.concat([mf.df, new_rows_for_year], ignore_index=True)
+                removed_count = original_count - len(mf.df)
                 
                 mf.write()
-                print(f"[-]  - Wrote {len(new_rows_for_year)} metadata updates for {year}.")
+                print(f"[-]  - Removed {removed_count} rows from {year} metadata.")
+
+            # --- 2. ADD NEW METADATA ---
+            # All new metadata belongs to the event's year.
+            event_year = event.start_date.year
+            print(f"[-] Adding new metadata entries to {event_year} metadata...")
+            event_year_mf = MetadataFile.get_instance(event_year)
+
+            original_count = len(event_year_mf.df)
+            event_year_mf.df = pd.concat([event_year_mf.df, new_metadata_df], ignore_index=True)
+            added_count = len(event_year_mf.df) - original_count
+
+            event_year_mf.write()
+            print(f"[-]  - Added {added_count} rows to {event_year} metadata.")
 
             # --- COMMIT EVENT TO CSV ---
             print("[-] Committing event to events.csv...")
@@ -215,8 +229,8 @@ def main():
     event_metadata_file = EventsMetadataFile.get_instance()
     # event_metadata_file.create_event(
     #     title='My Test Event',
-    #     start_date='2025-09-14',
-    #     end_date='2025-09-14',
+    #     start_date='2013-01-04',
+    #     end_date='2014-02-01',
     # )
 
 
