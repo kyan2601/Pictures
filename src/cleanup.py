@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 
 from src import constants, helper
 from src.classes.MetadataFile import MetadataFile
@@ -46,9 +47,33 @@ def check_for_deleted_media(metadata_file: MetadataFile) -> bool:
         return check_flag
 
     check_flag = False
+
+    metadata_deleted = metadata[~metadata['filepath'].isin(filepaths)]
+    deleted_metadata_filepath = os.path.join(helper.get_directory_for_year(metadata_file.year),
+                                             constants.METADATA_DELETED_FILENAME)
+
+    if os.path.exists(deleted_metadata_filepath):
+        deleted_df = pd.read_csv(str(deleted_metadata_filepath))
+        deleted_df['filepath'] = deleted_df['filepath'].apply(lambda x: helper.deserialize_filepath(x))
+        deleted_df = pd.concat([deleted_df, metadata_deleted]).drop_duplicates(subset=['filepath'], keep='last')
+    else:
+        deleted_df = metadata_deleted
+
+    # sort by filepath to have a consistent order
+    deleted_df = deleted_df.sort_values(by='filepath')
+
+    # write to deleted metadata file
+    deleted_df_to_write = deleted_df.copy()
+    deleted_df_to_write['filepath'] = deleted_df_to_write['filepath'].apply(lambda x: helper.serialize_filepath(x))
+    deleted_df_to_write = deleted_df_to_write[constants.METADATA_COLS]
+    deleted_df_to_write = deleted_df_to_write.replace({None: pd.NA})
+    deleted_df_to_write.to_csv(deleted_metadata_filepath, index=False)
+
     metadata_file.df = metadata_clean
     metadata_file.write()
-    print(f"[-] check_for_deleted_media() reduced the metadata file from {original_size} to {final_size} rows")
+    print(
+        f"[!] check_for_deleted_media() moved {len(metadata_deleted)} records to {constants.METADATA_DELETED_FILENAME}")
+    print(f"[!] check_for_deleted_media() reduced the metadata file from {original_size} to {final_size} rows")
     return check_flag
 
 
@@ -200,7 +225,7 @@ def clean_up_metadata(year):
 
 def main():
     years_to_check = [
-        2025
+        2015
     ]
 
     for year in years_to_check:
