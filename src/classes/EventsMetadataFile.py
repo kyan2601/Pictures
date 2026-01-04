@@ -137,6 +137,7 @@ class EventsMetadataFile:
         # 2. EXECUTION (TRANSACTIONAL BLOCK)
         event_dir = event.get_directory()
         event_dir_created = False
+        deletion_started = False
         try:
             print(f"[-] Creating event directory: {event_dir}")
             os.makedirs(event_dir, exist_ok=True)
@@ -185,6 +186,7 @@ class EventsMetadataFile:
 
             # --- DELETE ORIGINALS PHASE ---
             print("[-] Deleting original files...")
+            deletion_started = True
             for original_path in path_map.keys():
                 os.remove(original_path)
             print(f"[-] Successfully deleted {len(path_map)} original files.")
@@ -197,11 +199,15 @@ class EventsMetadataFile:
             print(f"\n[!!!] ERROR: An error occurred: {e}")
             print("[!!!] Rolling back changes...")
 
-            if event_dir_created:
+            if deletion_started:
+                print("[CRITICAL] An error occurred AFTER some original files were deleted.")
+                print(f"[CRITICAL] The new event directory '{event_dir}' will NOT be deleted to prevent data loss.")
+                print("[CRITICAL] Please manually verify its contents and clean up any remaining original files.")
+            elif event_dir_created:
                 print(f"[!!!]  - Deleting event directory: {event_dir}")
                 shutil.rmtree(event_dir, ignore_errors=True)
             
-            print("[!!!] Rollback complete. Original files were not deleted.")
+            print("[!!!] Rollback complete.")
             raise
 
 
