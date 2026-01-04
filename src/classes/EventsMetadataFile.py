@@ -1,11 +1,13 @@
-from src import constants, helper
-from src.classes.EventEntry import EventEntry
-from src.classes.MetadataFile import MetadataFile
-
 import os
 import glob
 import pandas as pd
 from datetime import datetime
+import shutil
+from collections import defaultdict
+
+from src import constants, helper
+from src.classes.EventEntry import EventEntry
+from src.classes.MetadataFile import MetadataFile
 
 
 def _calculate_next_event_index(year, month):
@@ -84,115 +86,123 @@ class EventsMetadataFile:
 
     def create_event(self, title, start_date, end_date,
                      description=None, nominal_month=None) -> EventEntry:
-        print(f'[*] Creating new event: {title}')
-        start_date = datetime.strptime(start_date, '%Y-%m-%d')
-        end_date = datetime.strptime(end_date, '%Y-%m-%d')
+        print(f'[*] Staging new event: {title}')
+        start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        end_date_dt = datetime.strptime(end_date, '%Y-%m-%d')
 
-        # Validate date range
-        if start_date > end_date:
-            raise RuntimeError(
-                f"Invalid date range: start_date ({start_date.strftime('%Y-%m-%d')}) must be <= end_date ({end_date.strftime('%Y-%m-%d')})"
-            )
+        # 1. VALIDATION AND PLANNING
+        if start_date_dt > end_date_dt:
+            raise RuntimeError(f"Invalid date range: start_date ({start_date}) must be <= end_date ({end_date})")
 
-        # Check for overlapping date ranges with existing events
         if len(self.df) > 0:
             for _, existing_event in self.df.iterrows():
                 existing_start = datetime.strptime(existing_event['start_date'], '%Y-%m-%d')
                 existing_end = datetime.strptime(existing_event['end_date'], '%Y-%m-%d')
-                
-                # Check if date ranges overlap
-                # Two ranges overlap if: start1 <= end2 AND start2 <= end1
-                if start_date <= existing_end and existing_start <= end_date:
+                if start_date_dt <= existing_end and existing_start <= end_date_dt:
                     raise RuntimeError(
                         f"Date range overlaps with existing event '{existing_event['title']}' "
-                        f"(ID: {existing_event['event_id']}, "
-                        f"{existing_event['start_date']} to {existing_event['end_date']}). "
-                        f"Only non-intersecting date ranges are supported."
+                        f"(ID: {existing_event['event_id']}, {existing_event['start_date']} to {existing_event['end_date']})."
                     )
 
-        event_id = self._next_event_id()
-        event_index = _calculate_next_event_index(start_date.strftime('%Y'), start_date.strftime('%m'))
-
-        event = EventEntry(
-            event_id=event_id,
-            event_index=event_index,
-            start_date=start_date,
-            end_date=end_date,
-            title=title,
-            description=description,
-            nominal_month=nominal_month,
-        )
-        print(f"[-] EventEntry created:")
-        print(event)
-
-        # update events metadata file
-        new_df = pd.DataFrame([event.to_dict()], columns=constants.EVENTS_COLS)
-        self.df = pd.concat([self.df, new_df], ignore_index=True)
-        self.write()
-        print(f"[-] Event Metadata file updated!")
-
-        # identify media in range (NOTE: edge case where this spans multiple years)
-        years = list(range(start_date.year, end_date.year + 1))
+        years = list(range(start_date_dt.year, end_date_dt.year + 1))
         metadata_files = [MetadataFile.get_instance(year) for year in years]
-        media_in_range = [
-            metadata_file.df[(metadata_file.df['dt'].dt.date >= start_date.date()) &
-                             (metadata_file.df['dt'].dt.date <= end_date.date())]
-            for metadata_file in metadata_files
+        media_in_range_dfs = [
+            mf.df[(mf.df['dt'].dt.date >= start_date_dt.date()) & (mf.df['dt'].dt.date <= end_date_dt.date())]
+            for mf in metadata_files
         ]
         
-        # Check if any media already belongs to an event
-        # Handle case where media_in_range might be empty or contain only empty DataFrames
-        if media_in_range and any(len(df) > 0 for df in media_in_range):
-            all_media_in_range = pd.concat(media_in_range)
-        else:
-            all_media_in_range = pd.DataFrame([], columns=constants.METADATA_COLS)
-        
-        media_with_existing_event = all_media_in_range[all_media_in_range['event_id'].notna()] if len(all_media_in_range) > 0 else pd.DataFrame([], columns=constants.METADATA_COLS)
-        
-        if len(media_with_existing_event) > 0:
-            existing_event_ids = media_with_existing_event['event_id'].unique()
-            filepaths = media_with_existing_event['filepath'].tolist()[:10]  # Show first 10
+        all_media_df = pd.concat(media_in_range_dfs) if media_in_range_dfs else pd.DataFrame()
+
+        if not all_media_df.empty and all_media_df['event_id'].notna().any():
+            media_with_event = all_media_df[all_media_df['event_id'].notna()]
             raise RuntimeError(
-                f"Found {len(media_with_existing_event)} media files that already belong to event(s) {existing_event_ids.tolist()}. "
-                f"Cannot move media that is already assigned to an event. "
-                f"Please investigate and remove media from existing events first. "
-                f"Sample filepaths: {filepaths}"
+                f"Found {len(media_with_event)} media files that already belong to an event. "
+                f"Cannot move media already assigned. Sample file: {media_with_event['filepath'].iloc[0]}"
             )
+
+        event_id = self._next_event_id()
+        event_index = _calculate_next_event_index(start_date_dt.strftime('%Y'), start_date_dt.strftime('%m'))
+        event = EventEntry(event_id, event_index, start_date_dt, end_date_dt, title, description, nominal_month)
+        print(f"[-] Event plan created with ID: {event.id}")
+
+        if all_media_df.empty:
+            print("[!] No media found in date range. Creating event entry only.")
+            self.df = pd.concat([self.df, pd.DataFrame([event.to_dict()])], ignore_index=True)
+            self.write()
+            print(f"[-] Event '{title}' created with no associated media.")
+            return event
+
+        print(f"[-] Found {len(all_media_df)} media files to associate with the event.")
         
-        num_media_in_range = sum(len(df) for df in media_in_range)
-        if num_media_in_range == 0:
-            print(f"[!!!] WARNING: Could not find any media in range of dates: {start_date.strftime('%Y-%m-%d')} -> {end_date.strftime('%Y-%m-%d')}!")
-        else:
-            print(f"[-] Found {num_media_in_range} media in range of dates: {start_date.strftime('%Y-%m-%d')} -> {end_date.strftime('%Y-%m-%d')}!")
+        # 2. EXECUTION (TRANSACTIONAL BLOCK)
+        event_dir = event.get_directory()
+        event_dir_created = False
+        try:
+            print(f"[-] Creating event directory: {event_dir}")
+            os.makedirs(event_dir, exist_ok=True)
+            event_dir_created = True
 
-        # create events directory
-        os.makedirs(event.get_directory(), exist_ok=True)
+            # --- COPY PHASE ---
+            print("[-] Copying files...")
+            path_map = {}
+            for _, row in all_media_df.iterrows():
+                original_filepath = row['filepath']
+                filename = os.path.basename(original_filepath)
+                new_filepath = os.path.join(event_dir, filename)
+                shutil.copy2(original_filepath, new_filepath)
+                path_map[original_filepath] = new_filepath
+            print(f"[-] Successfully copied {len(path_map)} files.")
 
-        # move media
-        def _helper_construct_event_media_filepath(old_filepath):
-            filename = helper.decompose_filepath(old_filepath)['filename']
-            return os.path.join(event.get_directory(), filename)
+            # --- METADATA UPDATE PHASE ---
+            print("[-] Updating metadata files...")
+            new_metadata_df = all_media_df.copy()
+            new_metadata_df['filepath'] = new_metadata_df['filepath'].map(path_map)
+            new_metadata_df['event_id'] = event.id
+            
+            media_by_year = defaultdict(list)
+            for original_path in path_map.keys():
+                year = helper.get_year_from_filepath(original_path)
+                media_by_year[year].append(original_path)
 
-        new_metadata = pd.concat(media_in_range)
-        new_metadata['new_filepath'] = new_metadata['filepath'].apply(_helper_construct_event_media_filepath)
-        for _, row in new_metadata.iterrows():
-            os.rename(row['filepath'], row['new_filepath'])
+            for year, original_paths_in_year in media_by_year.items():
+                mf = MetadataFile.get_instance(year)
+                
+                # Remove old rows
+                mf.df = mf.df[~mf.df['filepath'].isin(original_paths_in_year)]
+                
+                # Add new rows for this year
+                new_filepaths_in_year = [path_map[p] for p in original_paths_in_year]
+                new_rows_for_year = new_metadata_df[new_metadata_df['filepath'].isin(new_filepaths_in_year)]
+                mf.df = pd.concat([mf.df, new_rows_for_year], ignore_index=True)
+                
+                mf.write()
+                print(f"[-]  - Wrote {len(new_rows_for_year)} metadata updates for {year}.")
 
-        # remove old metadata
-        for metadata_file, in_range in zip(metadata_files, media_in_range):
-            metadata_file.df = metadata_file.df[~metadata_file.df['filepath'].isin(in_range['filepath'])]
-            metadata_file.write()
+            # --- COMMIT EVENT TO CSV ---
+            print("[-] Committing event to events.csv...")
+            self.df = pd.concat([self.df, pd.DataFrame([event.to_dict()])], ignore_index=True)
+            self.write()
 
-        # add new metadata (filepath & event_id)
-        event_year = start_date.year
-        mf = MetadataFile.get_instance(event_year)
-        new_metadata['filepath'] = new_metadata['new_filepath']
-        new_metadata['event_id'] = event_id
-        mf.df = pd.concat([mf.df, new_metadata[constants.METADATA_COLS]])
-        mf.write()
+            # --- DELETE ORIGINALS PHASE ---
+            print("[-] Deleting original files...")
+            for original_path in path_map.keys():
+                os.remove(original_path)
+            print(f"[-] Successfully deleted {len(path_map)} original files.")
+            
+            print(f"\n[SUCCESS] Event '{title}' created successfully!")
+            return event
 
-        print(f"[-] Event successfully created!")
-        return event
+        except Exception as e:
+            # 3. ROLLBACK
+            print(f"\n[!!!] ERROR: An error occurred: {e}")
+            print("[!!!] Rolling back changes...")
+
+            if event_dir_created:
+                print(f"[!!!]  - Deleting event directory: {event_dir}")
+                shutil.rmtree(event_dir, ignore_errors=True)
+            
+            print("[!!!] Rollback complete. Original files were not deleted.")
+            raise
 
 
 def main():
