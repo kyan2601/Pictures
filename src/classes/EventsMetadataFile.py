@@ -85,7 +85,7 @@ class EventsMetadataFile:
         return int(event_id)
 
     def create_event(self, title, start_date, end_date,
-                     description=None, nominal_month=None) -> EventEntry:
+                     description=None, nominal_month=None, backup=True) -> EventEntry:
         print(f'[*] Staging new event: {title}')
         start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
         end_date_dt = datetime.strptime(end_date, '%Y-%m-%d')
@@ -136,76 +136,93 @@ class EventsMetadataFile:
         
         # 2. EXECUTION (TRANSACTIONAL BLOCK)
         event_dir = event.get_directory()
+        backup_dir_for_event = None
+        if backup:
+            backup_dir_for_event = helper.create_backup_directory('create_event')
+
         event_dir_created = False
-        deletion_started = False
+        backup_dir_created = False
+        files_moved_to_backup = False
+        files_deleted = False
+
         try:
+            # --- SETUP DIRECTORIES ---
             print(f"[-] Creating event directory: {event_dir}")
             os.makedirs(event_dir, exist_ok=True)
             event_dir_created = True
 
-            # --- COPY PHASE ---
-            print("[-] Copying files...")
-            path_map = {}
-            for _, row in all_media_df.iterrows():
-                original_filepath = row['filepath']
-                filename = os.path.basename(original_filepath)
-                new_filepath = os.path.join(event_dir, filename)
-                shutil.copy2(original_filepath, new_filepath)
-                path_map[original_filepath] = new_filepath
-            print(f"[-] Successfully copied {len(path_map)} files.")
+            path_map = {} # Maps original_filepath -> new_filepath_in_event_dir
+
+            if backup:
+                # --- STRATEGY: MOVE TO BACKUP, THEN COPY TO EVENT ---
+                # The helper function creates the directory
+                backup_dir_created = True # For rollback logic
+
+                print("[-] Moving original files to backup directory...")
+                for _, row in all_media_df.iterrows():
+                    original_filepath = row['filepath']
+                    shutil.move(original_filepath, backup_dir_for_event)
+                files_moved_to_backup = True
+                print(f"[-] Successfully moved {len(all_media_df)} files to backup.")
+
+                print("[-] Copying files from backup to event directory...")
+                for _, row in all_media_df.iterrows():
+                    original_filepath = row['filepath']
+                    filename = os.path.basename(original_filepath)
+                    new_filepath_in_event_dir = os.path.join(event_dir, filename)
+                    # Source is now the backup dir
+                    shutil.copy2(os.path.join(backup_dir_for_event, filename), str(new_filepath_in_event_dir))
+                    path_map[original_filepath] = new_filepath_in_event_dir
+                print(f"[-] Successfully copied {len(path_map)} files to event directory.")
+            else:
+                # --- STRATEGY: COPY TO EVENT, THEN DELETE ORIGINALS ---
+                print("[-] Copying files to event directory...")
+                for _, row in all_media_df.iterrows():
+                    original_filepath = row['filepath']
+                    filename = os.path.basename(original_filepath)
+                    new_filepath = os.path.join(event_dir, filename)
+                    shutil.copy2(str(original_filepath), str(new_filepath))
+                    path_map[original_filepath] = new_filepath
+                print(f"[-] Successfully copied {len(path_map)} files.")
 
             # --- METADATA UPDATE PHASE ---
             print("[-] Updating metadata files...")
-            
-            # Prepare a dataframe of all the new metadata rows
             new_metadata_df = all_media_df.copy()
             new_metadata_df['filepath'] = new_metadata_df['filepath'].map(path_map)
             new_metadata_df['event_id'] = event.event_id
 
-            # --- 1. REMOVE OLD METADATA ---
-            # Group media by their original year to know which files to read/remove from.
             media_by_original_year = defaultdict(list)
             for original_path in path_map.keys():
                 year = helper.get_year_from_filepath(original_path)
                 media_by_original_year[year].append(original_path)
-
+            
             print("[-] Removing old metadata entries...")
             for year, original_paths_in_year in media_by_original_year.items():
                 mf = MetadataFile.get_instance(year)
-                
-                original_count = len(mf.df)
                 mf.df = mf.df[~mf.df['filepath'].isin(original_paths_in_year)]
-                removed_count = original_count - len(mf.df)
-                
                 mf.write()
-                print(f"[-]  - Removed {removed_count} rows from {year} metadata.")
-
-            # --- 2. ADD NEW METADATA ---
-            # All new metadata belongs to the event's year.
-            event_year = event.start_date.year
-            print(f"[-] Adding new metadata entries to {event_year} metadata...")
-            event_year_mf = MetadataFile.get_instance(event_year)
-
-            original_count = len(event_year_mf.df)
+            
+            print(f"[-] Adding new metadata entries to {event.start_date.year} metadata...")
+            event_year_mf = MetadataFile.get_instance(event.start_date.year)
             event_year_mf.df = pd.concat([event_year_mf.df, new_metadata_df], ignore_index=True)
-            added_count = len(event_year_mf.df) - original_count
-
             event_year_mf.write()
-            print(f"[-]  - Added {added_count} rows to {event_year} metadata.")
 
             # --- COMMIT EVENT TO CSV ---
             print("[-] Committing event to events.csv...")
             self.df = pd.concat([self.df, pd.DataFrame([event.to_dict()])], ignore_index=True)
             self.write()
 
-            # --- DELETE ORIGINALS PHASE ---
-            print("[-] Deleting original files...")
-            deletion_started = True
-            for original_path in path_map.keys():
-                os.remove(original_path)
-            print(f"[-] Successfully deleted {len(path_map)} original files.")
+            # --- DELETE/FINALIZE PHASE ---
+            if not backup:
+                print("[-] Deleting original files...")
+                for original_path in path_map.keys():
+                    os.remove(original_path)
+                files_deleted = True
+                print(f"[-] Successfully deleted {len(path_map)} original files.")
             
             print(f"\n[SUCCESS] Event '{title}' created successfully!")
+            if backup:
+                print(f"[INFO] A backup of the original files is stored at: {backup_dir_for_event}")
             return event
 
         except Exception as e:
@@ -213,13 +230,21 @@ class EventsMetadataFile:
             print(f"\n[!!!] ERROR: An error occurred: {e}")
             print("[!!!] Rolling back changes...")
 
-            if deletion_started:
-                print("[CRITICAL] An error occurred AFTER some original files were deleted.")
+            if files_moved_to_backup:
+                print("[CRITICAL] Files were moved to the backup directory but the process failed.")
+                print(f"[CRITICAL] The backup at '{backup_dir_for_event}' contains the original files.")
+                print("[CRITICAL] The event directory and metadata may be in an inconsistent state.")
+                print("[CRITICAL] Manual intervention is required.")
+            elif files_deleted:
+                print("[CRITICAL] An error occurred AFTER original files were deleted without a backup.")
                 print(f"[CRITICAL] The new event directory '{event_dir}' will NOT be deleted to prevent data loss.")
-                print("[CRITICAL] Please manually verify its contents and clean up any remaining original files.")
+                print("[CRITICAL] Please manually verify its contents and clean up.")
             elif event_dir_created:
                 print(f"[!!!]  - Deleting event directory: {event_dir}")
                 shutil.rmtree(event_dir, ignore_errors=True)
+            
+            if backup:
+                print(f"[INFO] The backup directory '{backup_dir_for_event}' has been preserved for manual review.")
             
             print("[!!!] Rollback complete.")
             raise

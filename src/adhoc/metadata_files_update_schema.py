@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 
-from src import constants, helper
+from src import constants
 
 
 def main():
@@ -29,7 +29,7 @@ def main():
 
         try:
             print(f"Processing {metadata_file}...")
-            df = pd.read_csv(metadata_file)
+            df = pd.read_csv(str(metadata_file))
 
             # Handle width and height types
             if 'width' in df.columns:

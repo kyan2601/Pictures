@@ -157,6 +157,32 @@ def get_directory_for_year_month(year, month):
 
 
 #####################################
+# BACKUP
+#####################################
+
+
+def create_backup_directory(action_type: str) -> str:
+    """
+    Creates a unique, timestamped backup directory for a specific action.
+
+    Args:
+        action_type (str): A string representing the type of action (e.g., 'create_event').
+
+    Returns:
+        str: The full path to the newly created backup directory.
+    """
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    backup_dir_name = f"{timestamp}_{action_type}"
+    backup_dir_path = os.path.join(constants.BACKUP_DIR, backup_dir_name)
+    
+    print(f"[-] Creating backup directory: {backup_dir_path}")
+    os.makedirs(backup_dir_path, exist_ok=True)
+    
+    return backup_dir_path
+
+
+
+#####################################
 # SERIALIZATION
 #####################################
 

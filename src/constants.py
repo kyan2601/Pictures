@@ -4,6 +4,7 @@ from enum import Enum
 SOURCE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(SOURCE_DIR)
 NEW_MEDIA_DIR = os.path.join(ROOT_DIR, 'new')
+BACKUP_DIR = os.path.join(ROOT_DIR, 'backup')
 
 METADATA_FILENAME = 'metadata.csv'
 METADATA_DELETED_FILENAME = 'metadata_DELETED.csv'
