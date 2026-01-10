@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import shutil
 
 from src import constants, helper
 from src.classes.MetadataFile import MetadataFile
@@ -188,6 +189,13 @@ def reorder_media_by_datetime(metadata_file: MetadataFile, dry_run=False) -> boo
     if dry_run:
         print(f"[!] DRY RUN: Would rename {len(path_map)} files.")
         return check_flag
+
+    # --- BACKUP PHASE ---
+    backup_dir = helper.create_backup_directory('reorder_media')
+    print(f"[-] Backing up {len(path_map)} files to {backup_dir} before reordering...")
+    for old_path in path_map.keys():
+        shutil.copy2(old_path, backup_dir)
+    print(f"[-] Backup complete.")
 
     tmp_map = {}
     renamed_to_final_map = {}
