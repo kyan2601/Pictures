@@ -199,6 +199,20 @@ class EventsMetadataFile:
             print("[-] Removing old metadata entries...")
             for year, original_paths_in_year in media_by_original_year.items():
                 mf = MetadataFile.get_instance(year)
+
+                if backup:
+                    # Save the metadata rows that are about to be deleted
+                    deleted_rows_df = mf.df[mf.df['filepath'].isin(original_paths_in_year)].copy()
+                    
+                    if not deleted_rows_df.empty:
+                        deleted_metadata_filepath = os.path.join(backup_dir_for_event, f'deleted_metadata_{year}.csv')
+                        print(f"[-] Saving {len(deleted_rows_df)} deleted metadata records to: {deleted_metadata_filepath}")
+                        
+                        # Serialize filepath for writing
+                        deleted_rows_df['filepath'] = deleted_rows_df['filepath'].apply(lambda x: helper.serialize_filepath(x))
+                        deleted_rows_df[constants.METADATA_COLS].to_csv(deleted_metadata_filepath, index=False)
+
+                # Remove the old metadata entries
                 mf.df = mf.df[~mf.df['filepath'].isin(original_paths_in_year)]
                 mf.write()
             
