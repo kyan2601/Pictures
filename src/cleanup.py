@@ -50,34 +50,31 @@ def check_for_deleted_media(metadata_file: MetadataFile, dry_run=False) -> bool:
     metadata_deleted = metadata[~metadata['filepath'].isin(filepaths)]
 
     if dry_run:
-        print(f"[!] DRY RUN: Would move {len(metadata_deleted)} records to {constants.METADATA_DELETED_FILENAME}")
-        print(f"[!] DRY RUN: Would reduce the metadata file from {original_size} to {final_size} rows")
+        print(f"[!] DRY RUN: Would save {len(metadata_deleted)} records to a new backup location.")
+        print(f"[!] DRY RUN: Would reduce the metadata file from {original_size} to {final_size} rows.")
         return check_flag
 
-    deleted_metadata_filepath = os.path.join(helper.get_directory_for_year(metadata_file.year),
-                                             constants.METADATA_DELETED_FILENAME)
+    # Create a new backup directory for this specific cleanup action
+    backup_dir = helper.create_backup_directory('cleanup_metadata')
+    deleted_metadata_filepath = os.path.join(backup_dir, f'deleted_metadata_{metadata_file.year}.csv')
+    
+    print(f"[-] Saving {len(metadata_deleted)} deleted metadata records to: {deleted_metadata_filepath}")
 
-    if os.path.exists(deleted_metadata_filepath):
-        deleted_df = pd.read_csv(str(deleted_metadata_filepath))
-        deleted_df['filepath'] = deleted_df['filepath'].apply(lambda x: helper.deserialize_filepath(x))
-        deleted_df = pd.concat([deleted_df, metadata_deleted]).drop_duplicates(subset=['filepath'], keep='last')
-    else:
-        deleted_df = metadata_deleted
+    # Sort by filepath to have a consistent order
+    deleted_df = metadata_deleted.sort_values(by='filepath')
 
-    # sort by filepath to have a consistent order
-    deleted_df = deleted_df.sort_values(by='filepath')
-
-    # write to deleted metadata file
+    # Write to the new deleted metadata file in the backup directory
     deleted_df_to_write = deleted_df.copy()
     deleted_df_to_write['filepath'] = deleted_df_to_write['filepath'].apply(lambda x: helper.serialize_filepath(x))
     deleted_df_to_write = deleted_df_to_write[constants.METADATA_COLS]
     deleted_df_to_write = deleted_df_to_write.replace({None: pd.NA})
     deleted_df_to_write.to_csv(deleted_metadata_filepath, index=False)
 
+    # Update the original metadata file by removing the deleted rows
     metadata_file.df = metadata_clean
     metadata_file.write()
-    print(
-        f"[!] check_for_deleted_media() moved {len(metadata_deleted)} records to {constants.METADATA_DELETED_FILENAME}")
+
+    print(f"[!] check_for_deleted_media() saved {len(metadata_deleted)} records to {deleted_metadata_filepath}")
     print(f"[!] check_for_deleted_media() reduced the metadata file from {original_size} to {final_size} rows")
     return check_flag
 
