@@ -1,7 +1,8 @@
 import os
 import pandas as pd
+import shutil
 
-from src import constants
+from src import constants, helper
 
 
 def main():
@@ -20,6 +21,10 @@ def main():
         print(f"Error: Root directory '{constants.ROOT_DIR}' not found. Aborting.")
         return
 
+    # Create backup directory
+    backup_dir = helper.create_backup_directory('update_metadata_schema')
+    print(f"Created backup directory at: {backup_dir}")
+
     for year in year_dirs:
         metadata_file = os.path.join(constants.ROOT_DIR, year, constants.METADATA_FILENAME)
 
@@ -28,6 +33,11 @@ def main():
             continue
 
         try:
+            # Before processing, back up the original file
+            backup_path = os.path.join(backup_dir, f'old_metadata_{year}.csv')
+            shutil.copy2(str(metadata_file), str(backup_path))
+            print(f"Backed up original metadata for year {year} to {backup_path}")
+
             print(f"Processing {metadata_file}...")
             df = pd.read_csv(str(metadata_file))
 
@@ -46,7 +56,7 @@ def main():
                     else:
                         print(f"  Adding missing column '{col}' with NA value.")
                         df[col] = pd.NA
-            
+
             # Ensure 'is_highlight' is int and fill any potential NA values from other operations
             if 'is_highlight' in df.columns:
                 df['is_highlight'] = df['is_highlight'].fillna(0).astype(int)
