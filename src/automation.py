@@ -1,5 +1,6 @@
 import os
 import glob
+import shutil
 from collections import Counter
 
 from prettytable import PrettyTable
@@ -9,7 +10,41 @@ from src.classes.MediaEntry import MediaEntry
 from src.classes.MetadataFile import MetadataFile
 
 
-def identify_live_photo_movies(remove=False, verbose=True):
+def delete_dot_underscore_files(verbose=True):
+    """
+    Deletes (moves to backup) all files starting with '._' in the NEW_MEDIA_DIR.
+    These are typically AppleDouble files.
+    """
+    dot_underscore_files = []
+    for root, _, files in os.walk(constants.NEW_MEDIA_DIR):
+        for file in files:
+            if file.startswith('._'):
+                dot_underscore_files.append(os.path.join(root, file))
+
+    if not dot_underscore_files:
+        if verbose:
+            print("[-] No '._' files found in NEW_MEDIA_DIR to process.")
+        return
+
+    if verbose:
+        print(f"[-] Found {len(dot_underscore_files)} '._' files to move to backup.")
+
+    backup_dir = helper.create_backup_directory('delete_dot_underscore_files')
+    moved_count = 0
+    for filepath in dot_underscore_files:
+        try:
+            shutil.move(str(filepath), backup_dir)
+            moved_count += 1
+            if verbose:
+                print(f"[-] Moved '._' file to backup: {filepath}")
+        except Exception as e:
+            print(f"!!! ERROR: Failed to move '._' file {filepath} to backup: {e}")
+
+    if verbose:
+        print(f"[*] Finished moving {moved_count} '._' files to backup.")
+
+
+def identify_live_photo_movies(verbose=True):
     media_filepaths = helper.get_filepaths_by_directory(constants.NEW_MEDIA_DIR, ignore_new_media=False)
 
     if len(media_filepaths) == 0:
@@ -51,21 +86,22 @@ def identify_live_photo_movies(remove=False, verbose=True):
             live_photos.append(base_filepath)
 
     if verbose:
-        print("[-] Found {} live photos".format(len(live_photos)))
+        print(f"[-] Moving {len(live_photos)} live photo movies to backup...")
 
-    if remove:
-        for base_filepath in live_photos:
-            ext = constants.VideoExtension.MOV.name.lower() \
-                if constants.VideoExtension.MOV.name.lower() in grouped_filenames[base_filepath]['video_extensions'] \
-                else constants.VideoExtension.MOV.value.lower()
-            mov_filepath = f'{base_filepath}.{ext}'
-            if os.path.exists(mov_filepath):
-                os.remove(mov_filepath)
-                if verbose:
-                    print(f'[-] Removed live photo movie: {mov_filepath}')
-
+    backup_dir = helper.create_backup_directory('live_photo_removal')
+    moved_count = 0
+    for base_filepath in live_photos:
+        ext = constants.VideoExtension.MOV.name.lower() \
+            if constants.VideoExtension.MOV.name.lower() in grouped_filenames[base_filepath]['video_extensions'] \
+            else constants.VideoExtension.MOV.value.lower()
+        mov_filepath = f'{base_filepath}.{ext}'
+        if os.path.exists(mov_filepath):
+            shutil.move(mov_filepath, backup_dir)
+            moved_count += 1
+            if verbose:
+                print(f'[-] Moved live photo movie to backup: {mov_filepath}')
     if verbose:
-        print(f'[*] Finished removing {len(live_photos)} live photo movies!')
+        print(f'[*] Finished moving {moved_count} live photo movies to backup!')
 
 
 def sort_and_rename_new_pictures(verbose=True):
@@ -77,6 +113,9 @@ def sort_and_rename_new_pictures(verbose=True):
 
     if verbose:
         print('[-] Found {} files to sort'.format(len(media_filepaths)))
+    
+    # Create backup directory for this operation
+    backup_dir = helper.create_backup_directory('sort_and_rename_new_media')
 
     media = [media_class_controller.create_media_entry(fp) for fp in media_filepaths]
 
@@ -102,6 +141,11 @@ def sort_and_rename_new_pictures(verbose=True):
         idx += len(existing_files)
 
         for media_obj in date_media:
+            # First, make a backup of the original file
+            shutil.copy2(media_obj.filepath, backup_dir)
+            if verbose:
+                print(f'[-] Backed up {media_obj.filepath} to {backup_dir}')
+
             new_filepath = os.path.join(
                 path_dir,
                 date.strftime('%y%m%d') + str(idx).zfill(3) + '.' + media_obj.ext.value
@@ -133,6 +177,14 @@ def index_metadata(media: list[MediaEntry], verbose=True):
         print(f'[-] Updating metadata file for year {year}')
         metadata = [m.to_dict() for m in media_by_year[year]]
         metadata_file = MetadataFile.get_instance(year)
+
+        # Before modifying, back up the existing metadata.csv if it exists
+        if os.path.exists(metadata_file.filepath):
+            backup_dir = helper.create_backup_directory('index_metadata')
+            shutil.copy2(metadata_file.filepath, backup_dir)
+            if verbose:
+                print(f'[-] Backed up existing metadata.csv for year {year} to {backup_dir}')
+
         metadata_file.add_media_metadata(metadata)
 
         if verbose:
@@ -155,7 +207,8 @@ def index_metadata_for_year(year):
 
 
 def process_new_media(verbose=True):
-    identify_live_photo_movies(remove=True, verbose=verbose)
+    delete_dot_underscore_files(verbose=verbose)
+    identify_live_photo_movies(verbose=verbose)
     media = sort_and_rename_new_pictures(verbose=verbose)
     index_metadata(media, verbose=verbose)
     print("Finished processing new media!")
