@@ -25,6 +25,7 @@ class MediaEntry(ABC):
         self.event_id = None
         self.is_highlight = 0
         self.phash = None
+        self.norm_pixel_hash = None
         self.load()
 
     def _get_metadata_file(self):

@@ -6,11 +6,12 @@ from src.classes.MetadataFile import MetadataFile
 
 
 def main():
-    print("Starting backfill of phash for pictures.")
+    print("Starting backfill of pixel hash for pictures.")
 
     root_dir = constants.ROOT_DIR
     year_dirs = [d for d in os.listdir(root_dir) if os.path.isdir(os.path.join(root_dir, d)) and d.isdigit()]
     all_years = sorted([int(y) for y in year_dirs])
+    all_years = [2024,2025]
 
     picture_extensions = [e.lower() for e in constants.PICTURE_EXTENSIONS]
 
@@ -32,15 +33,15 @@ def main():
             ext = helper.decompose_filepath(filepath)['ext'].lower()
 
             if ext in picture_extensions:
-                if pd.isna(row['phash']) or not row['phash']:
+                if pd.isna(row['norm_pixel_hash']) or not row['norm_pixel_hash']:
                     try:
                         media_entry = media_class_controller.create_media_entry(filepath)
-                        phash = media_entry._calculate_phash()
-                        if phash:
-                            mf.df.loc[index, 'phash'] = phash
+                        norm_pixel_hash = media_entry._calculate_norm_pixel_hash()
+                        if norm_pixel_hash:
+                            mf.df.loc[index, 'norm_pixel_hash'] = norm_pixel_hash
                             updated += 1
                         else:
-                            print(f"    - Warning: phash could not be calculated for {filepath}")
+                            print(f"    - Warning: pixel hash could not be calculated for {filepath}")
                     except Exception as e:
                         print(f"    - Error processing {filepath}: {e}")
 
@@ -50,7 +51,7 @@ def main():
         else:
             print(f"No updates needed for year {year}.")
 
-    print("Finished backfill of phash.")
+    print("Finished backfill of pixel hashes.")
 
 
 if __name__ == '__main__':

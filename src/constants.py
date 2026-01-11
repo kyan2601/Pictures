@@ -10,7 +10,8 @@ METADATA_FILENAME = 'metadata.csv'
 METADATA_DELETED_FILENAME = 'metadata_DELETED.csv'
 METADATA_COLS = ['filepath', 'dt', 'width', 'height',
                  'latitude', 'longitude', 'altitude', 'orientation',
-                 'title', 'tags', 'people', 'comments', 'event_id', 'is_highlight', 'phash']
+                 'title', 'tags', 'people', 'comments', 'event_id', 'is_highlight',
+                 'phash', 'norm_pixel_hash']
 
 EVENTS_FILEPATH = os.path.join(SOURCE_DIR, 'events.csv')
 EVENTS_COLS = ['event_id', 'event_index',
