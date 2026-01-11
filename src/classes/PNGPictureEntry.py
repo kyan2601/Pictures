@@ -20,3 +20,4 @@ class PNGPictureEntry(PictureEntry):
         self.dt = datetime.fromtimestamp(os.path.getctime(self.filepath))
         self.width = helper.try_except(lambda: image.width, None)
         self.height = helper.try_except(lambda: image.height, None)
+        self.phash = self._calculate_phash()

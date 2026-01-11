@@ -1,6 +1,7 @@
 exif
 ffmpeg-python
 geopy
+imagehash
 pandas
 pillow
 pillow_heif

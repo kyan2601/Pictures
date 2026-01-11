@@ -46,3 +46,8 @@ class HEICPictureEntry(PictureEntry):
 
         self.altitude = helper.try_except(lambda: gps_metadata['GPSAltitude'], None)
         self.orientation = helper.try_except(lambda: gps_metadata['GPSImgDirection'], None)
+        self.phash = self._calculate_phash()
+
+    def _calculate_phash(self):
+        register_heif_opener()
+        return super()._calculate_phash()

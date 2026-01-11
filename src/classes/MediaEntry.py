@@ -24,6 +24,7 @@ class MediaEntry(ABC):
         self.comments = None
         self.event_id = None
         self.is_highlight = 0
+        self.phash = None
         self.load()
 
     def _get_metadata_file(self):
@@ -51,10 +52,6 @@ class MediaEntry(ABC):
             self._load_metadata()
         else:
             self._extract_metadata()
-
-    def move(self, new_path):
-        os.rename(self.filepath, new_path)
-        self.filepath = new_path
 
     def to_dict(self):
         return {k: v for k, v in vars(self).items() if k in constants.METADATA_COLS}

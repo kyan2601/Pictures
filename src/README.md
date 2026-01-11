@@ -50,6 +50,7 @@ Finally, we wrap up with the title of the event.
    1. `uname -a` should show you're on a Linux WSL
    2. `lsb_release -a` should show you're on Ubuntu (Ubuntu 24.04.2 LTS in my case)
 2. Then `cd` into the project directory (`cd /mnt/f/Pictures/` for example)
+   1. If your drive is not mounted correctly, you can remount with `sudo mount -t drvfs F: /mnt/f`
 3. Install Cursor CLI if haven't already (https://cursor.com/docs/cli/overview)
 4. `cursor-agent --model "auto"` to get started in interactive shell.
 

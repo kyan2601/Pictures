@@ -14,8 +14,8 @@ def main():
     print("Starting migration of metadata files to the latest schema.")
 
     try:
-        year_dirs = [d for d in os.listdir(constants.ROOT_DIR) if
-                     d.isdigit() and os.path.isdir(os.path.join(constants.ROOT_DIR, d))]
+        year_dirs = sorted([int(d) for d in os.listdir(constants.ROOT_DIR) if
+                            d.isdigit() and os.path.isdir(os.path.join(constants.ROOT_DIR, d))])
         print(f"Found year directories: {year_dirs}")
     except FileNotFoundError:
         print(f"Error: Root directory '{constants.ROOT_DIR}' not found. Aborting.")
@@ -26,7 +26,7 @@ def main():
     print(f"Created backup directory at: {backup_dir}")
 
     for year in year_dirs:
-        metadata_file = os.path.join(constants.ROOT_DIR, year, constants.METADATA_FILENAME)
+        metadata_file = os.path.join(constants.ROOT_DIR, str(year), constants.METADATA_FILENAME)
 
         if not os.path.exists(metadata_file):
             print(f"No metadata file found for year {year}, skipping.")

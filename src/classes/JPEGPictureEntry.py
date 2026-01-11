@@ -39,3 +39,4 @@ class JPEGPictureEntry(PictureEntry):
             tags = ';'.join([keyword for keyword in keywords if not helper.keyword_is_name(keyword)])
         self.people = people if people else None
         self.tags = tags if tags else None
+        self.phash = self._calculate_phash()
