@@ -1,7 +1,8 @@
 import os
 import pandas as pd
 
-from src import constants, helper, media_class_controller
+from src import constants, helper
+from src.classes import media_class_factory
 from src.classes.entities.MetadataFile import MetadataFile
 
 
@@ -35,7 +36,7 @@ def main():
             if ext in picture_extensions:
                 if pd.isna(row['norm_pixel_hash']) or not row['norm_pixel_hash']:
                     try:
-                        media_entry = media_class_controller.create_media_entry(filepath)
+                        media_entry = media_class_factory.create_media_entry(filepath)
                         norm_pixel_hash = media_entry._calculate_norm_pixel_hash()
                         if norm_pixel_hash:
                             mf.df.loc[index, 'norm_pixel_hash'] = norm_pixel_hash

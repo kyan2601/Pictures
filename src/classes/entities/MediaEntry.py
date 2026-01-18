@@ -1,3 +1,4 @@
+import os
 from abc import ABC, abstractmethod
 
 from src import constants, helper
@@ -52,6 +53,10 @@ class MediaEntry(ABC):
             self._load_metadata()
         else:
             self._extract_metadata()
+
+    def move(self, new_path):
+        os.rename(self.filepath, new_path)
+        self.filepath = new_path
 
     def to_dict(self):
         return {k: v for k, v in vars(self).items() if k in constants.METADATA_COLS}

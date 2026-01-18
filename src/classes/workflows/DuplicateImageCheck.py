@@ -9,7 +9,8 @@ from PIL import Image
 from skimage.metrics import structural_similarity as ssim
 from pillow_heif import register_heif_opener
 
-from src import media_class_controller, helper, constants
+from src import helper, constants
+from src.classes import media_class_factory
 from src.classes.entities.PictureEntry import PictureEntry
 
 register_heif_opener()
@@ -47,7 +48,7 @@ class DuplicateImageCheck:
     def _get_media_entry(self, filepath: str) -> PictureEntry:
         """Gets or creates a MediaEntry for a given filepath."""
         if filepath not in self.picture_entries:
-            self.picture_entries[filepath] = media_class_controller.create_media_entry(filepath)
+            self.picture_entries[filepath] = media_class_factory.create_media_entry(filepath)
         return self.picture_entries[filepath]
 
     def _get_phash(self, filepath: str) -> str:

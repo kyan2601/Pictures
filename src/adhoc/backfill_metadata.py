@@ -1,9 +1,9 @@
-from src import automation
+from src.classes.workflows.ProcessNewMedia import ProcessNewMedia
 
 
 def main():
     year = 2023
-    automation.index_metadata_for_year(year)
+    ProcessNewMedia().index_metadata_for_year(year)
 
     # mf = MetadataFile.get_instance(year)
     # mf.df['width'] = mf.df['width'].astype(int)
