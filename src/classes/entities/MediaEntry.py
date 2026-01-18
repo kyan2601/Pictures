@@ -1,4 +1,4 @@
-import os
+import shutil
 from abc import ABC, abstractmethod
 
 from src import constants, helper
@@ -55,7 +55,7 @@ class MediaEntry(ABC):
             self._extract_metadata()
 
     def move(self, new_path):
-        os.rename(self.filepath, new_path)
+        shutil.move(self.filepath, new_path)
         self.filepath = new_path
 
     def to_dict(self):
