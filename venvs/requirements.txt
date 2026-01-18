@@ -2,7 +2,9 @@ exif
 ffmpeg-python
 geopy
 imagehash
+opencv-python
 pandas
 pillow
 pillow_heif
 prettytable
+scikit-image

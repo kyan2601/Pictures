@@ -104,6 +104,8 @@ def check_for_unexpected_NAs(metadata_file: MetadataFile) -> bool:
         completion = sum(metadata[col].notnull()) / len_metadata
         print(f"Column: {col} - {completion:.1%}")
 
+    # TODO: pixel hashes should be mandatory for pictures
+
     return check_flag
 
 

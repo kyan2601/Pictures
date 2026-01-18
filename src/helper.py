@@ -181,7 +181,6 @@ def create_backup_directory(action_type: str) -> str:
     return backup_dir_path
 
 
-
 #####################################
 # SERIALIZATION
 #####################################

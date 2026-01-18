@@ -1,13 +1,15 @@
 import os
+import shutil
+from typing import Any
+
 import cv2
 import numpy as np
-import hashlib
+from enum import Enum
 from PIL import Image
-import imagehash
 from skimage.metrics import structural_similarity as ssim
 from pillow_heif import register_heif_opener
 
-from src import media_class_controller, helper
+from src import media_class_controller, helper, constants
 from src.classes.PictureEntry import PictureEntry
 
 register_heif_opener()
@@ -22,7 +24,6 @@ class DuplicateImageChecker:
     3. SSIM: Identifies visually identical (but not byte-for-byte identical) images.
     """
 
-    IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'}
     PHASH_DISTANCE_THRESHOLD = 8
     SSIM_IDENTICAL_THRESHOLD = 0.99
 
@@ -31,6 +32,11 @@ class DuplicateImageChecker:
     WEIGHT_SHARPNESS = 0.002
     WEIGHT_FILESIZE_DEFAULT = 0.2
     WEIGHT_FILESIZE_HEIC = 0.1
+
+    class SimilarityTiers(Enum):
+        SIMILAR = 1
+        IDENTICAL = 2
+        EXACT = 3
 
     def __init__(self, directory_path: str):
         if not os.path.isdir(directory_path):
@@ -44,29 +50,26 @@ class DuplicateImageChecker:
             self.picture_entries[filepath] = media_class_controller.create_media_entry(filepath)
         return self.picture_entries[filepath]
 
-    def _get_phash(self, filepath: str) -> str | None:
-        """Gets pHash from metadata or computes it if missing."""
+    def _get_phash(self, filepath: str) -> str:
+        """Gets pHash from metadata."""
         entry = self._get_media_entry(filepath)
         if entry.phash and isinstance(entry.phash, str):
             return entry.phash
-
-        calculated_phash = entry._calculate_phash()
-        if calculated_phash:
-            return calculated_phash
-
-        return None
+        else:
+            raise RuntimeError(f"phash could not be found for: {filepath}. All images are expected to have phashes.")
 
     @staticmethod
     def _phash_distance(h1: str, h2: str) -> int:
         """Calculates the bit difference between two pHash hex strings."""
         return (int(h1, 16) ^ int(h2, 16)).bit_count()
 
-    @staticmethod
-    def _pixel_hash(filepath: str) -> tuple[str, tuple[int, int]]:
-        """Computes a SHA256 hash of the image's pixel data."""
-        with Image.open(filepath) as img:
-            img = img.convert("RGB")
-            return hashlib.sha256(img.tobytes()).hexdigest(), img.size
+    def _get_norm_pixel_hash(self, filepath: str) -> str:
+        """Gets normalized pixel hash from metadata."""
+        entry = self._get_media_entry(filepath)
+        if entry.norm_pixel_hash and isinstance(entry.norm_pixel_hash, str):
+            return entry.norm_pixel_hash
+        else:
+            raise RuntimeError(f"Normalized pixel hash could not be found for: {filepath}. All images are expected to have pixel hashes.")
 
     @staticmethod
     def _compute_sharpness(filepath: str) -> float:
@@ -120,7 +123,7 @@ class DuplicateImageChecker:
         image_files = []
         for root, _, files in os.walk(self.directory_path):
             for f in files:
-                if os.path.splitext(f.lower())[1] in self.IMAGE_EXTS:
+                if os.path.splitext(f.lower())[1].replace('.', '') in constants.PICTURE_EXTENSIONS:
                     image_files.append(os.path.join(root, f))
         return image_files
 
@@ -157,21 +160,21 @@ class DuplicateImageChecker:
 
         return groups
 
-    def _process_group(self, group: list[str]) -> list[tuple[str, list[str]]]:
+    def _process_group(self, group: list[str]) -> list[tuple[SimilarityTiers, Any]]:
         """Processes a pHash group to find EXACT, IDENTICAL, and SIMILAR matches."""
         # Tier 2: Pixel Hash for exact matches
         pixel_map = {}
         for p in group:
             try:
-                h, size = self._pixel_hash(p)
-                pixel_map.setdefault((h, size), []).append(p)
+                h = self._get_norm_pixel_hash(p)
+                pixel_map.setdefault(h, []).append(p)
             except Exception as e:
                 print(f"Warning: Could not compute pixel hash for {p}: {e}")
 
         exact_matches = [paths for paths in pixel_map.values() if len(paths) > 1]
         remaining_for_ssim = [paths[0] for paths in pixel_map.values() if len(paths) == 1]
         
-        categorized = [( "EXACT", paths) for paths in exact_matches]
+        categorized = [(self.SimilarityTiers.EXACT, paths) for paths in exact_matches]
 
         # Tier 3: SSIM for visually identical matches
         used = set()
@@ -195,7 +198,7 @@ class DuplicateImageChecker:
                     print(f"Warning: Could not compute SSIM between {p1} and {p2}: {e}")
 
             if len(identical_cluster) > 1:
-                categorized.append(("IDENTICAL", identical_cluster))
+                categorized.append((self.SimilarityTiers.IDENTICAL, identical_cluster))
             else:
                 # The leftover single images from the original pHash group are just 'similar'
                 pass
@@ -204,7 +207,7 @@ class DuplicateImageChecker:
         all_categorized_files = {p for _, paths in categorized for p in paths}
         similar_images = [p for p in group if p not in all_categorized_files]
         if similar_images:
-             categorized.append(("SIMILAR", similar_images))
+            categorized.append((self.SimilarityTiers.SIMILAR, similar_images))
              
         return categorized
 
@@ -217,22 +220,32 @@ class DuplicateImageChecker:
                 if len(imgs) <= 1:
                     continue
 
-                scores = {p: self._compute_quality_score(p) for p in imgs}
-                best_image = max(scores, key=scores.get)
+                if tag in [self.SimilarityTiers.EXACT, self.SimilarityTiers.IDENTICAL]:
+                    scores = {p: self._compute_quality_score(p) for p in imgs}
+                    best_image = max(scores, key=scores.get)
 
-                print(f"\n[{tag} DUPLICATES]")
-                for p, s in sorted(scores.items(), key=lambda item: item[1], reverse=True):
-                    action = "KEEP" if p == best_image else "REMOVE"
-                    print(f"  [{action}] {helper.serialize_filepath(p)} (Score: {s:.2f})")
+                    print(f"\n[Tier {tag.value} - {tag.name} DUPLICATES]")
+                    for p, s in sorted(scores.items(), key=lambda item: item[1], reverse=True):
+                        action = "KEEP" if p == best_image else "REMOVE"
+                        print(f"  [{action}] {p} (Score: {s:.2f})")
 
-                if not dry_run:
-                    for p in imgs:
-                        if p != best_image:
-                            try:
-                                print(f"Removing {helper.serialize_filepath(p)}")
-                                os.remove(p)
-                            except OSError as e:
-                                print(f"Error removing file {p}: {e}")
+                    if not dry_run:
+                        backup_dir = helper.create_backup_directory("remove_duplicate_images")
+                        for p in imgs:
+                            if p != best_image:
+                                try:
+                                    print(f"Moving {p} to {backup_dir}")
+                                    shutil.move(p, backup_dir)
+                                except (OSError, shutil.Error) as e:
+                                    print(f"Error moving file {p}: {e}")
+
+                elif tag in [self.SimilarityTiers.SIMILAR]:
+                    print(f"\n[Tier {tag.value} - {tag.name} IMAGES] - should manually review")
+                    for img in imgs:
+                        print(f"  - {img}")
+
+                else:
+                    raise ValueError(f"Unrecognized tag: {tag}")
 
     def run(self, dry_run: bool = True):
         """
@@ -263,19 +276,8 @@ class DuplicateImageChecker:
         else:
             print("\nDuplicate removal complete.")
 
+
 if __name__ == '__main__':
-    # Example usage:
-    # This assumes the script is run from the project root.
-    # Replace with a valid directory path for testing.
-    # e.g., checker = DuplicateImageChecker("/path/to/your/images")
-    
-    # You need to provide a directory to scan.
-    # For example, if you have a folder named 'test_images' in your project root:
-    # current_directory = os.getcwd()
-    # test_image_dir = os.path.join(current_directory, 'test_images')
-    # if os.path.exists(test_image_dir):
-    #     checker = DuplicateImageChecker(test_image_dir)
-    #     checker.run(dry_run=True)
-    # else:
-    #     print("Test directory not found. Please create 'test_images' and add images to it.")
-    pass
+    image_dir = helper.get_directory_for_year_month(2020, 12)
+    checker = DuplicateImageChecker(image_dir)
+    checker.run(dry_run=True)
