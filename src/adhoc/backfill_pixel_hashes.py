@@ -2,7 +2,7 @@ import os
 import pandas as pd
 
 from src import constants, helper, media_class_controller
-from src.classes.MetadataFile import MetadataFile
+from src.classes.entities.MetadataFile import MetadataFile
 
 
 def main():

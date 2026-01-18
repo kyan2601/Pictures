@@ -1,8 +1,7 @@
-import os
 from abc import ABC, abstractmethod
 
 from src import constants, helper
-from src.classes.MetadataFile import MetadataFile
+from src.classes.entities.MetadataFile import MetadataFile
 
 
 class MediaEntry(ABC):

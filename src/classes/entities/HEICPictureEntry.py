@@ -6,7 +6,7 @@ import PIL.Image
 from pillow_heif import register_heif_opener
 
 from src import constants, helper
-from src.classes.PictureEntry import PictureEntry
+from src.classes.entities.PictureEntry import PictureEntry
 
 
 class HEICPictureEntry(PictureEntry):

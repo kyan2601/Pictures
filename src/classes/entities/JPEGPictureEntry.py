@@ -4,7 +4,7 @@ from datetime import datetime
 import exif
 
 from src import constants, helper
-from src.classes.PictureEntry import PictureEntry
+from src.classes.entities.PictureEntry import PictureEntry
 
 
 class JPEGPictureEntry(PictureEntry):

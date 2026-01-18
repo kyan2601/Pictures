@@ -3,7 +3,7 @@ import pandas as pd
 import shutil
 
 from src import constants, helper
-from src.classes.MetadataFile import MetadataFile
+from src.classes.entities.MetadataFile import MetadataFile
 
 
 def identify_overlapping_filenames(metadata_file: MetadataFile) -> bool:

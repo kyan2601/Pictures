@@ -4,7 +4,7 @@ from datetime import datetime
 import PIL.Image
 
 from src import constants, helper
-from src.classes.PictureEntry import PictureEntry
+from src.classes.entities.PictureEntry import PictureEntry
 
 
 class PNGPictureEntry(PictureEntry):

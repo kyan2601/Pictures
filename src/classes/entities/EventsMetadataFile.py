@@ -6,8 +6,8 @@ import shutil
 from collections import defaultdict
 
 from src import constants, helper
-from src.classes.EventEntry import EventEntry
-from src.classes.MetadataFile import MetadataFile
+from src.classes.entities.EventEntry import EventEntry
+from src.classes.entities.MetadataFile import MetadataFile
 
 
 def _calculate_next_event_index(year, month):

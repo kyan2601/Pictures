@@ -1,5 +1,5 @@
 from src import constants
-from src.classes.JPEGPictureEntry import JPEGPictureEntry
+from src.classes.entities.JPEGPictureEntry import JPEGPictureEntry
 
 
 class JPGPictureEntry(JPEGPictureEntry):

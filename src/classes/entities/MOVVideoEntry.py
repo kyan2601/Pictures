@@ -4,14 +4,14 @@ from datetime import datetime
 import ffmpeg
 
 from src import constants, helper
-from src.classes.VideoEntry import VideoEntry
+from src.classes.entities.VideoEntry import VideoEntry
 
 
-class MP4VideoEntry(VideoEntry):
+class MOVVideoEntry(VideoEntry):
 
     def __init__(self, filepath):
         super().__init__(filepath)
-        self.ext = constants.VideoExtension.MP4
+        self.ext = constants.VideoExtension.MOV
 
     def _extract_metadata(self):
         data = ffmpeg.probe(self.filepath)
@@ -30,13 +30,14 @@ class MP4VideoEntry(VideoEntry):
             raise RuntimeError(f"No video stream found in {self.filepath}")
 
         self.dt = helper.try_except(
-            lambda: datetime.fromisoformat(data['format']['tags']['creation_time']),
+            lambda: datetime.fromisoformat(data['format']['tags']['com.apple.quicktime.creationdate']).replace(
+                tzinfo=None),
             datetime.fromtimestamp(os.path.getctime(self.filepath))
         )
         self.width = helper.try_except(lambda: int(video_metadata['width']), None)
         self.height = helper.try_except(lambda: int(video_metadata['height']), None)
         self.latitude, self.longitude, self.altitude = helper.try_except(
-            lambda: helper.lat_long_parser(data['format']['tags']['location']),
+            lambda: helper.lat_long_parser(data['format']['tags']['com.apple.quicktime.location.ISO6709']),
             (None, None, None))
         # Note: duration is extracted but not stored in metadata.csv as it's not in METADATA_COLS
         # If needed in the future, add it to constants.METADATA_COLS

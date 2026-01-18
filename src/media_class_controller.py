@@ -1,10 +1,10 @@
 from src import helper
-from src.classes.HEICPictureEntry import HEICPictureEntry
-from src.classes.JPEGPictureEntry import JPEGPictureEntry
-from src.classes.JPGPictureEntry import JPGPictureEntry
-from src.classes.MOVVideoEntry import MOVVideoEntry
-from src.classes.MP4VideoEntry import MP4VideoEntry
-from src.classes.PNGPictureEntry import PNGPictureEntry
+from src.classes.entities.HEICPictureEntry import HEICPictureEntry
+from src.classes.entities.JPEGPictureEntry import JPEGPictureEntry
+from src.classes.entities.JPGPictureEntry import JPGPictureEntry
+from src.classes.entities.MOVVideoEntry import MOVVideoEntry
+from src.classes.entities.MP4VideoEntry import MP4VideoEntry
+from src.classes.entities.PNGPictureEntry import PNGPictureEntry
 
 
 def create_media_entry(filepath):

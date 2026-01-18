@@ -4,7 +4,7 @@ import imagehash
 import hashlib
 
 from src import constants
-from src.classes.MediaEntry import MediaEntry
+from src.classes.entities.MediaEntry import MediaEntry
 
 
 class PictureEntry(MediaEntry, ABC):

@@ -1,5 +1,4 @@
 from src import automation
-from src.classes.MetadataFile import MetadataFile
 
 
 def main():

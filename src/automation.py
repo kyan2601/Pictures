@@ -6,8 +6,8 @@ from collections import Counter
 from prettytable import PrettyTable
 
 from src import constants, helper, media_class_controller
-from src.classes.MediaEntry import MediaEntry
-from src.classes.MetadataFile import MetadataFile
+from src.classes.entities.MediaEntry import MediaEntry
+from src.classes.entities.MetadataFile import MetadataFile
 
 
 def delete_dot_underscore_files(verbose=True):

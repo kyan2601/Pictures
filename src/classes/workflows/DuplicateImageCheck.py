@@ -10,12 +10,12 @@ from skimage.metrics import structural_similarity as ssim
 from pillow_heif import register_heif_opener
 
 from src import media_class_controller, helper, constants
-from src.classes.PictureEntry import PictureEntry
+from src.classes.entities.PictureEntry import PictureEntry
 
 register_heif_opener()
 
 
-class DuplicateImageChecker:
+class DuplicateImageCheck:
     """
     A class to find and handle duplicate images in a directory using a 3-tier classification system.
     Tiers:
@@ -279,5 +279,5 @@ class DuplicateImageChecker:
 
 if __name__ == '__main__':
     image_dir = helper.get_directory_for_year_month(2020, 12)
-    checker = DuplicateImageChecker(image_dir)
+    checker = DuplicateImageCheck(image_dir)
     checker.run(dry_run=True)

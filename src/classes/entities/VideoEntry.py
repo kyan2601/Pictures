@@ -1,7 +1,7 @@
 from abc import ABC
 
 from src import constants
-from src.classes.MediaEntry import MediaEntry
+from src.classes.entities.MediaEntry import MediaEntry
 
 
 class VideoEntry(MediaEntry, ABC):
