@@ -38,4 +38,4 @@ class PictureEntry(MediaEntry, ABC):
 
         canvas.paste(img_resized, (offset_x, offset_y))
 
-        return hashlib.sha256(img.tobytes()).hexdigest()
+        return hashlib.sha256(canvas.tobytes()).hexdigest()
