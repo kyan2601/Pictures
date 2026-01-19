@@ -33,8 +33,9 @@ class HEICPictureEntry(PictureEntry):
             if k in PIL.ExifTags.GPSTAGS
         }
 
-        self.dt = helper.try_except(lambda: datetime.strptime(metadata['DateTime'], '%Y:%m:%d %H:%M:%S'),
-                                    datetime.fromtimestamp(os.path.getctime(self.filepath)))
+        dt_obj = helper.try_except(lambda: datetime.strptime(metadata['DateTime'], '%Y:%m:%d %H:%M:%S'),
+                                   datetime.fromtimestamp(os.path.getctime(self.filepath)))
+        self.dt = dt_obj.replace(tzinfo=None) if dt_obj and dt_obj.tzinfo else dt_obj
         self.width = image.width
         self.height = image.height
         self.latitude, self.longitude = helper.try_except(

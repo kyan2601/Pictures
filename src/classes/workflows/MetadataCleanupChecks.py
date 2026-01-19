@@ -11,28 +11,6 @@ class MetadataCleanupChecks:
         self.year = year
         self.metadata_file = MetadataFile.get_instance(self.year)
 
-    def _identify_overlapping_filenames(self) -> bool:
-        print(f"[*] Initiating overlapping filename search [{self.metadata_file.year}]")
-        check_flag = True
-
-        metadata = self.metadata_file.df.copy()
-        metadata['filename_without_ext'] = metadata['filepath'].apply(
-            lambda x: helper.decompose_filepath(x)['filename_without_ext'])
-
-        metadata_agg = metadata.groupby(by='filename_without_ext').size().reset_index()
-        metadata_agg.columns = ['filename_without_ext', 'count']
-        metadata_agg = metadata_agg[metadata_agg['count'] > 1]
-        metadata_agg = metadata_agg.sort_values(by=['count', 'filename_without_ext'], ascending=False)
-
-        if len(metadata_agg) > 0:
-            print("[!!!] WARNING: Found {} overlapping filenames:".format(len(metadata_agg)))
-            print(metadata_agg)
-            raise RuntimeError("[!!!] ACTION REQUIRED!")
-
-        print("[-] No overlapping filenames found!")
-        print("[*] Finished overlapping filename search!")
-        return check_flag
-
     def _check_for_deleted_media(self, dry_run=False) -> bool:
         print(f"[*] Searching for removed media to clean from metadata [{self.metadata_file.year}]")
         check_flag = True
@@ -105,6 +83,28 @@ class MetadataCleanupChecks:
 
         # TODO: pixel hashes should be mandatory for pictures
 
+        return check_flag
+
+    def _identify_overlapping_filenames(self) -> bool:
+        print(f"[*] Initiating overlapping filename search [{self.metadata_file.year}]")
+        check_flag = True
+
+        metadata = self.metadata_file.df.copy()
+        metadata['filename_without_ext'] = metadata['filepath'].apply(
+            lambda x: helper.decompose_filepath(x)['filename_without_ext'])
+
+        metadata_agg = metadata.groupby(by='filename_without_ext').size().reset_index()
+        metadata_agg.columns = ['filename_without_ext', 'count']
+        metadata_agg = metadata_agg[metadata_agg['count'] > 1]
+        metadata_agg = metadata_agg.sort_values(by=['count', 'filename_without_ext'], ascending=False)
+
+        if len(metadata_agg) > 0:
+            print("[!!!] WARNING: Found {} overlapping filenames:".format(len(metadata_agg)))
+            print(metadata_agg)
+            raise RuntimeError("[!!!] ACTION REQUIRED!")
+
+        print("[-] No overlapping filenames found!")
+        print("[*] Finished overlapping filename search!")
         return check_flag
 
     def _check_for_mismatching_filename_and_datetime(self) -> bool:
@@ -239,9 +239,9 @@ class MetadataCleanupChecks:
 
         check_flag = True
 
-        check_flag &= self._identify_overlapping_filenames()
         check_flag &= self._check_for_deleted_media(dry_run=dry_run)
         check_flag &= self._check_for_unexpected_NAs()
+        check_flag &= self._identify_overlapping_filenames()
         check_flag &= self._check_for_mismatching_filename_and_datetime()
         check_flag &= self._reorder_media_by_datetime(dry_run=dry_run)
 
@@ -257,7 +257,7 @@ class MetadataCleanupChecks:
 if __name__ == '__main__':
     # years_to_check = sorted([int(d) for d in os.listdir(constants.ROOT_DIR) if
     #                          d.isdigit() and os.path.isdir(os.path.join(constants.ROOT_DIR, d))])
-    years_to_check = [2019]
+    years_to_check = [2025]
 
     for year in years_to_check:
         cleaner = MetadataCleanupChecks(year=year)

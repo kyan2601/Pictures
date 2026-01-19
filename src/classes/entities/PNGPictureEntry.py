@@ -17,7 +17,8 @@ class PNGPictureEntry(PictureEntry):
         image = PIL.Image.open(self.filepath)
         image.load()
 
-        self.dt = datetime.fromtimestamp(os.path.getctime(self.filepath))
+        dt_obj = datetime.fromtimestamp(os.path.getctime(self.filepath))
+        self.dt = dt_obj.replace(tzinfo=None) if dt_obj and dt_obj.tzinfo else dt_obj
         self.width = helper.try_except(lambda: image.width, None)
         self.height = helper.try_except(lambda: image.height, None)
         self.phash = self._calculate_phash()

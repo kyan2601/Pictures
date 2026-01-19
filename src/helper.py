@@ -55,6 +55,7 @@ def keyword_is_name(keyword):
 def get_filepaths_by_directory(directory=constants.ROOT_DIR, ignore_new_media=True) -> list[str]:
     """
     Get all media file paths from a directory recursively.
+    This will NOT find hidden files starting with '._*'.
     
     Args:
         directory: Directory to search (defaults to ROOT_DIR)

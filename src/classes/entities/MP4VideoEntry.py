@@ -29,10 +29,11 @@ class MP4VideoEntry(VideoEntry):
         if video_metadata is None:
             raise RuntimeError(f"No video stream found in {self.filepath}")
 
-        self.dt = helper.try_except(
+        dt_obj = helper.try_except(
             lambda: datetime.fromisoformat(data['format']['tags']['creation_time']),
             datetime.fromtimestamp(os.path.getctime(self.filepath))
         )
+        self.dt = dt_obj.replace(tzinfo=None) if dt_obj and dt_obj.tzinfo else dt_obj
         self.width = helper.try_except(lambda: int(video_metadata['width']), None)
         self.height = helper.try_except(lambda: int(video_metadata['height']), None)
         self.latitude, self.longitude, self.altitude = helper.try_except(

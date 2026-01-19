@@ -16,8 +16,9 @@ class JPEGPictureEntry(PictureEntry):
     def _extract_metadata(self):
         img = exif.Image(self.filepath)
 
-        self.dt = helper.try_except(lambda: datetime.strptime(img['datetime_original'], '%Y:%m:%d %H:%M:%S'),
-                                    datetime.fromtimestamp(os.path.getctime(self.filepath)))
+        dt_obj = helper.try_except(lambda: datetime.strptime(img['datetime_original'], '%Y:%m:%d %H:%M:%S'),
+                                   datetime.fromtimestamp(os.path.getctime(self.filepath)))
+        self.dt = dt_obj.replace(tzinfo=None) if dt_obj and dt_obj.tzinfo else dt_obj
         self.width = helper.try_except(lambda: img['pixel_x_dimension'], None)
         self.height = helper.try_except(lambda: img['pixel_y_dimension'], None)
         self.latitude, self.longitude = helper.try_except(
