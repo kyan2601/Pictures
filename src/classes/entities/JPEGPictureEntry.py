@@ -41,4 +41,4 @@ class JPEGPictureEntry(PictureEntry):
         self.people = people if people else None
         self.tags = tags if tags else None
         self.phash = self._calculate_phash()
-        self.norm_pixel_hash = self._calculate_norm_pixel_hash()
+        self.dhash = self._calculate_dhash()

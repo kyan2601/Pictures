@@ -22,4 +22,4 @@ class PNGPictureEntry(PictureEntry):
         self.width = helper.try_except(lambda: image.width, None)
         self.height = helper.try_except(lambda: image.height, None)
         self.phash = self._calculate_phash()
-        self.norm_pixel_hash = self._calculate_norm_pixel_hash()
+        self.dhash = self._calculate_dhash()
