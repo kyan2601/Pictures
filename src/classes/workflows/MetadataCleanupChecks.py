@@ -3,6 +3,7 @@ import pandas as pd
 import shutil
 
 from src import constants, helper
+from src.classes import media_class_factory
 from src.classes.entities.MetadataFile import MetadataFile
 
 
@@ -10,6 +11,46 @@ class MetadataCleanupChecks:
     def __init__(self, year: int):
         self.year = year
         self.metadata_file = MetadataFile.get_instance(self.year)
+
+    def _check_for_unindexed_media(self, dry_run=False) -> bool:
+        print(f"[*] Searching for unindexed media in year [{self.year}]")
+        check_flag = True
+
+        year_dir = helper.get_directory_for_year(self.year)
+        all_filepaths = set(helper.get_filepaths_by_directory(year_dir))
+        indexed_filepaths = set(self.metadata_file.df['filepath'].tolist())
+        
+        unindexed_files = all_filepaths - indexed_filepaths
+
+        if not unindexed_files:
+            print("[-] No unindexed media found.")
+            return check_flag
+
+        check_flag = False
+        print(f"[!!!] WARNING: Found {len(unindexed_files)} unindexed media files.")
+
+        if dry_run:
+            print("[!] DRY RUN: Following files are not indexed!")
+            for f in list(unindexed_files)[:5]:
+                print(f"  - {f}")
+            if len(unindexed_files) > 5:
+                print(f"  - ... and {len(unindexed_files) - 5} more.")
+            return check_flag
+
+        print(f"[-] Indexing {len(unindexed_files)} new media files...")
+        
+        new_media_entries = [media_class_factory.create_media_entry(fp) for fp in unindexed_files]
+        new_metadata = [m.to_dict() for m in new_media_entries]
+
+        # Backup existing metadata before modification
+        backup_dir = helper.create_backup_directory('unindexed_media_check')
+        shutil.copy2(self.metadata_file.filepath, backup_dir)
+        print(f"[-] Backed up existing metadata file for year {self.year} to {backup_dir}")
+
+        self.metadata_file.add_media_metadata(new_metadata)
+        print(f"[*] Successfully added {len(unindexed_files)} new entries to the metadata file.")
+        
+        return check_flag
 
     def _check_for_deleted_media(self, dry_run=False) -> bool:
         print(f"[*] Searching for removed media to clean from metadata [{self.metadata_file.year}]")
@@ -36,7 +77,7 @@ class MetadataCleanupChecks:
             print(f"[!] DRY RUN: Would reduce the metadata file from {original_size} to {final_size} rows.")
             return check_flag
 
-        backup_dir = helper.create_backup_directory('cleanup_metadata')
+        backup_dir = helper.create_backup_directory('cleanup_deleted_metadata')
         deleted_metadata_filepath = os.path.join(backup_dir, f'deleted_metadata_{self.metadata_file.year}.csv')
         
         print(f"[-] Saving {len(metadata_deleted)} deleted metadata records to: {deleted_metadata_filepath}")
@@ -239,6 +280,7 @@ class MetadataCleanupChecks:
 
         check_flag = True
 
+        check_flag &= self._check_for_unindexed_media(dry_run=dry_run)
         check_flag &= self._check_for_deleted_media(dry_run=dry_run)
         check_flag &= self._check_for_unexpected_NAs()
         check_flag &= self._identify_overlapping_filenames()
@@ -247,9 +289,10 @@ class MetadataCleanupChecks:
 
         print('--------------------------------------------------------------------------------------------')
         if check_flag:
-            print(f"[*] Metadata checks all within expectations!")
+            print(f"[*] Metadata checks for {self.year} all within expectations!")
         else:
-            print(f"[!!!] WARNING: Metadata checks returned unexpected results. PLEASE REVIEW logs above.")
+            print(f"[!!!] WARNING: Metadata checks for {self.year} returned unexpected results. PLEASE REVIEW logs above.")
+        print('--------------------------------------------------------------------------------------------')
 
         return check_flag
 
@@ -260,8 +303,7 @@ if __name__ == '__main__':
     years_to_check = [2025]
 
     for year in years_to_check:
-        cleaner = MetadataCleanupChecks(year=year)
-        check_flag = cleaner.run(dry_run=True)
+        check_flag = MetadataCleanupChecks(year=year).run(dry_run=False)
         if not check_flag:
             raise RuntimeError(f"Metadata checks unexpected for year [{year}]")
 
