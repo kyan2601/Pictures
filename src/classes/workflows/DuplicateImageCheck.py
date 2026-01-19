@@ -214,39 +214,45 @@ class DuplicateImageCheck:
 
     def _handle_groups(self, groups: list[list[str]], dry_run: bool):
         """Processes categorized groups to select the best image and optionally remove others."""
+        all_categorized_subgroups = []
         for group in groups:
             categorized_subgroups = self._process_group(group)
+            all_categorized_subgroups.extend(categorized_subgroups)
 
-            for tag, imgs in categorized_subgroups:
-                if len(imgs) <= 1:
-                    continue
+        # Sort by similarity tier, highest value first
+        all_categorized_subgroups.sort(key=lambda item: item[0].value, reverse=True)
 
-                if tag in [self.SimilarityTiers.EXACT, self.SimilarityTiers.IDENTICAL]:
-                    scores = {p: self._compute_quality_score(p) for p in imgs}
-                    best_image = max(scores, key=scores.get)
+        total_groups = len(all_categorized_subgroups)
+        for i, (tag, imgs) in enumerate(all_categorized_subgroups):
+            if len(imgs) <= 1:
+                continue
 
-                    print(f"\n[Tier {tag.value} - {tag.name} DUPLICATES]")
-                    for p, s in sorted(scores.items(), key=lambda item: item[1], reverse=True):
-                        action = "KEEP" if p == best_image else "REMOVE"
-                        print(f"  [{action}] {p} (Score: {s:.2f})")
+            if tag in [self.SimilarityTiers.EXACT, self.SimilarityTiers.IDENTICAL]:
+                scores = {p: self._compute_quality_score(p) for p in imgs}
+                best_image = max(scores, key=scores.get)
 
-                    if not dry_run:
-                        backup_dir = helper.create_backup_directory("remove_duplicate_images")
-                        for p in imgs:
-                            if p != best_image:
-                                try:
-                                    print(f"Moving {p} to {backup_dir}")
-                                    shutil.move(p, backup_dir)
-                                except (OSError, shutil.Error) as e:
-                                    print(f"Error moving file {p}: {e}")
+                print(f"\nGROUP {i+1}: [Tier {tag.value} - {tag.name} DUPLICATES]")
+                for p, s in sorted(scores.items(), key=lambda item: item[1], reverse=True):
+                    action = "KEEP" if p == best_image else "REMOVE"
+                    print(f"  [{action}] {p} (Score: {s:.2f})")
 
-                elif tag in [self.SimilarityTiers.SIMILAR]:
-                    print(f"\n[Tier {tag.value} - {tag.name} IMAGES] - should manually review")
-                    for img in imgs:
-                        print(f"  - {img}")
+                if not dry_run:
+                    backup_dir = helper.create_backup_directory("remove_duplicate_images")
+                    for p in imgs:
+                        if p != best_image:
+                            try:
+                                print(f"Moving {p} to {backup_dir}")
+                                shutil.move(p, backup_dir)
+                            except (OSError, shutil.Error) as e:
+                                print(f"Error moving file {p}: {e}")
 
-                else:
-                    raise ValueError(f"Unrecognized tag: {tag}")
+            elif tag in [self.SimilarityTiers.SIMILAR]:
+                print(f"\nGROUP {i+1}: [Tier {tag.value} - {tag.name} IMAGES] - should manually review")
+                for img in imgs:
+                    print(f"  - {img}")
+
+            else:
+                raise ValueError(f"Unrecognized tag: {tag}")
 
     def run(self, dry_run: bool = True):
         """
@@ -279,6 +285,6 @@ class DuplicateImageCheck:
 
 
 if __name__ == '__main__':
-    image_dir = helper.get_directory_for_year_month(2020, 12)
+    image_dir = helper.get_directory_for_year_month(2025, 10)
     checker = DuplicateImageCheck(image_dir)
     checker.run(dry_run=True)
