@@ -237,6 +237,7 @@ class DuplicateImageCheck:
             print("\nDRY RUN COMPLETE. No files were deleted.")
         else:
             print("\nDuplicate removal complete.")
+            print("\nIMPORTANT: Please double check and run MetadataCleanupChecks to update metadata!")
 
 
 if __name__ == '__main__':
