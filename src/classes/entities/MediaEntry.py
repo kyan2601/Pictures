@@ -26,6 +26,10 @@ class MediaEntry(ABC):
         self.is_highlight = 0
         self.phash = None
         self.dhash = None
+
+        self.media_type = None
+        self.ext = None
+
         self.load()
 
     def _get_metadata_file(self):

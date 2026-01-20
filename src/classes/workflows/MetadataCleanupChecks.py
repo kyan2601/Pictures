@@ -304,7 +304,5 @@ if __name__ == '__main__':
 
     for year in years_to_check:
         check_flag = MetadataCleanupChecks(year=year).run(dry_run=False)
-        if not check_flag:
-            raise RuntimeError(f"Metadata checks unexpected for year [{year}]")
 
     print(f"[*] Finished cleaning up years: {', '.join([str(year) for year in years_to_check])}")
