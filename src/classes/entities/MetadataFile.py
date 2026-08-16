@@ -44,6 +44,7 @@ class MetadataFile:
             os.makedirs(dirname, exist_ok=True)
 
             self.df = pd.DataFrame([], columns=constants.METADATA_COLS)
+            self.df['dt'] = pd.to_datetime(self.df['dt'])
             self.write()
         else:
             self.df = pd.read_csv(self.filepath)

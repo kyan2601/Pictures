@@ -2,34 +2,15 @@ import os
 from datetime import datetime
 
 import pytest
+from conftest import seed_media
 
 from src.classes.entities.MetadataFile import MetadataFile
 from src.classes.workflows.MetadataCleanupChecks import MetadataCleanupChecks
 
 
-def _seed(tmp_root, year, month, filename_dt_pairs):
-    """
-    Writes each (filename, dt) pair as a real (dummy-content) file under
-    tmp_root/year/month/ and registers matching metadata rows for that year.
-    """
-    month_dir = tmp_root / str(year) / str(month).zfill(2)
-    month_dir.mkdir(parents=True, exist_ok=True)
-
-    records = []
-    for filename, dt in filename_dt_pairs:
-        filepath = month_dir / filename
-        # Content is tagged with its own original filename so a test can tell which
-        # original file ended up under which name after a cyclic rename.
-        filepath.write_bytes(filename.encode())
-        records.append({'filepath': str(filepath), 'dt': dt})
-
-    MetadataFile.get_instance(year).add_media_metadata(records)
-    return {filename: str(month_dir / filename) for filename, _ in filename_dt_pairs}
-
-
 class TestNoIssues:
     def test_returns_true_and_renames_nothing_when_already_in_order(self, tmp_root):
-        paths = _seed(tmp_root, 2025, 1, [
+        paths = seed_media(tmp_root, 2025, 1, [
             ('250101001.jpg', datetime(2025, 1, 1, 9, 0)),
             ('250101002.jpg', datetime(2025, 1, 1, 10, 0)),
         ])
@@ -45,7 +26,7 @@ class TestNoIssues:
 class TestDryRun:
     def test_detects_but_does_not_rename(self, tmp_root):
         # dt order is reversed relative to filename index -> needs reordering.
-        paths = _seed(tmp_root, 2025, 1, [
+        paths = seed_media(tmp_root, 2025, 1, [
             ('250101001.jpg', datetime(2025, 1, 1, 10, 0)),
             ('250101002.jpg', datetime(2025, 1, 1, 9, 0)),
         ])
@@ -64,7 +45,7 @@ class TestSuccessfulReorder:
         # Three-way cyclic mismatch: every file's target name is another file's
         # current name, forcing the code through its tmp-rename staging (the whole
         # reason the 3-phase approach exists).
-        paths = _seed(tmp_root, 2025, 1, [
+        paths = seed_media(tmp_root, 2025, 1, [
             ('250101001.jpg', datetime(2025, 1, 1, 12, 0)),  # should become ...003
             ('250101002.jpg', datetime(2025, 1, 1, 8, 0)),   # should become ...001
             ('250101003.jpg', datetime(2025, 1, 1, 10, 0)),  # should become ...002
@@ -93,7 +74,7 @@ class TestSuccessfulReorder:
 
 class TestRollbackOnFailure:
     def test_restores_original_filenames_and_metadata_on_mid_rename_failure(self, tmp_root, monkeypatch):
-        paths = _seed(tmp_root, 2025, 1, [
+        paths = seed_media(tmp_root, 2025, 1, [
             ('250101001.jpg', datetime(2025, 1, 1, 12, 0)),
             ('250101002.jpg', datetime(2025, 1, 1, 8, 0)),
             ('250101003.jpg', datetime(2025, 1, 1, 10, 0)),
