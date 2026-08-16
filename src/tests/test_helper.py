@@ -1,5 +1,6 @@
 import os
 
+import pandas as pd
 import pytest
 
 from src import helper
@@ -103,3 +104,36 @@ class TestTryExcept:
     def test_only_catches_specified_exceptions(self):
         with pytest.raises(ZeroDivisionError):
             helper.try_except(lambda: 1 / 0, 'failed', TypeError)
+
+
+class TestGpsCoordinatesToLatLong:
+    def test_converts_dms_tuples_to_decimal_degrees(self):
+        # 37 deg 46' 26.4" N, 122 deg 25' 9.6" W (roughly San Francisco).
+        lat, long = helper.gps_coordinates_to_lat_long('N', (37, 46, 26.4), 'W', (122, 25, 9.6))
+        assert lat == pytest.approx(37.774, abs=1e-3)
+        assert long == pytest.approx(-122.4193, abs=1e-3)
+
+    def test_south_and_west_refs_negate_the_value(self):
+        lat, long = helper.gps_coordinates_to_lat_long('S', (10, 0, 0), 'E', (20, 0, 0))
+        assert lat == pytest.approx(-10.0)
+        assert long == pytest.approx(20.0)
+
+
+class TestLatLongParser:
+    def test_parses_signed_lat_long_and_altitude_from_iso6709(self):
+        lat, long, alt = helper.lat_long_parser('+37.7749-122.4194+015.000/')
+        assert lat == pytest.approx(37.7749)
+        assert long == pytest.approx(-122.4194)
+        assert alt == pytest.approx(15.0)
+
+    def test_altitude_is_na_when_only_lat_long_present(self):
+        lat, long, alt = helper.lat_long_parser('+37.7749-122.4194/')
+        assert lat == pytest.approx(37.7749)
+        assert long == pytest.approx(-122.4194)
+        assert pd.isna(alt)
+
+    def test_returns_na_for_all_fields_when_unparseable(self):
+        lat, long, alt = helper.lat_long_parser('no coordinates here')
+        assert pd.isna(lat)
+        assert pd.isna(long)
+        assert pd.isna(alt)

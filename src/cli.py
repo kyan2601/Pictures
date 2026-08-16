@@ -21,7 +21,7 @@ def _find_duplicates(args):
     DuplicateImageCheck(directory).run(dry_run=not args.execute)
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description="Pictures file system workflows.")
     subparsers = parser.add_subparsers(dest='command', required=True)
 
@@ -43,7 +43,7 @@ def main():
     dup_parser.add_argument('--execute', action='store_true', help='Apply changes (default is dry run).')
     dup_parser.set_defaults(func=_find_duplicates)
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     args.func(args)
 
 

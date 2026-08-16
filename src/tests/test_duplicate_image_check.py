@@ -1,3 +1,4 @@
+import os
 from types import SimpleNamespace
 
 from src.classes.workflows.DuplicateImageCheck import DuplicateImageCheck
@@ -97,3 +98,87 @@ class TestComputeQualityScore:
         # Same megapixels and same bytes-per-pixel; only the filesize weight differs,
         # so the HEIC file (lower weight) must score lower than the JPG.
         assert heic_score < jpg_score
+
+
+class TestHandleGroups:
+    def test_removes_lower_scoring_duplicate_to_backup(self, tmp_root):
+        # This is the step that actually decides what gets deleted -- everything
+        # upstream (grouping, scoring) just feeds into this.
+        check = _make_check(tmp_root)
+        a_path, b_path = str(tmp_root / 'a.jpg'), str(tmp_root / 'b.jpg')
+        (tmp_root / 'a.jpg').write_bytes(b'\x00' * 100_000)  # bigger -> higher score -> KEEP
+        (tmp_root / 'b.jpg').write_bytes(b'\x00' * 1_000)    # smaller -> lower score -> REMOVE
+        check.picture_entries = {
+            a_path: _entry(phash='0', dhash='0000000000000000', width=100, height=100),
+            b_path: _entry(phash='0', dhash='0000000000000001', width=100, height=100),
+        }
+
+        check._handle_groups([[a_path, b_path]], dry_run=False)
+
+        assert os.path.exists(a_path)
+        assert not os.path.exists(b_path)
+        backup_dirs = list((tmp_root / 'backup').iterdir())
+        assert len(backup_dirs) == 1
+        assert (backup_dirs[0] / 'b.jpg').exists()
+
+    def test_dry_run_removes_nothing(self, tmp_root):
+        check = _make_check(tmp_root)
+        a_path, b_path = str(tmp_root / 'a.jpg'), str(tmp_root / 'b.jpg')
+        (tmp_root / 'a.jpg').write_bytes(b'\x00' * 100_000)
+        (tmp_root / 'b.jpg').write_bytes(b'\x00' * 1_000)
+        check.picture_entries = {
+            a_path: _entry(phash='0', dhash='0000000000000000', width=100, height=100),
+            b_path: _entry(phash='0', dhash='0000000000000001', width=100, height=100),
+        }
+
+        check._handle_groups([[a_path, b_path]], dry_run=True)
+
+        assert os.path.exists(a_path)
+        assert os.path.exists(b_path)
+        assert not (tmp_root / 'backup').exists()
+
+    def test_tied_scores_are_unsure_and_nothing_is_removed(self, tmp_root):
+        check = _make_check(tmp_root)
+        a_path, b_path = str(tmp_root / 'a.jpg'), str(tmp_root / 'b.jpg')
+        (tmp_root / 'a.jpg').write_bytes(b'\x00' * 1_000)
+        (tmp_root / 'b.jpg').write_bytes(b'\x00' * 1_000)  # identical size -> identical score
+        check.picture_entries = {
+            a_path: _entry(phash='0', dhash='0000000000000000', width=100, height=100),
+            b_path: _entry(phash='0', dhash='0000000000000001', width=100, height=100),
+        }
+
+        check._handle_groups([[a_path, b_path]], dry_run=False)
+
+        assert os.path.exists(a_path)
+        assert os.path.exists(b_path)
+
+    def test_similar_tier_is_never_removed(self, tmp_root):
+        # SIMILAR is a manual-review-only bucket; _handle_groups has no removal
+        # branch for it at all.
+        check = _make_check(tmp_root)
+        a_path, b_path = str(tmp_root / 'a.jpg'), str(tmp_root / 'b.jpg')
+        (tmp_root / 'a.jpg').write_bytes(b'x')
+        (tmp_root / 'b.jpg').write_bytes(b'x')
+        check.picture_entries = {
+            # Distinct dhashes far enough apart that they never cluster into a
+            # DUPLICATE sub-group, so both fall into the SIMILAR leftover bucket.
+            a_path: _entry(phash='0', dhash='0000000000000000', width=100, height=100),
+            b_path: _entry(phash='0', dhash='ffffffffffffffff', width=100, height=100),
+        }
+
+        check._handle_groups([[a_path, b_path]], dry_run=False)
+
+        assert os.path.exists(a_path)
+        assert os.path.exists(b_path)
+        # A backup dir is created eagerly whenever any dHash groups exist at all
+        # (even SIMILAR-only ones), but nothing is ever moved into it.
+        backup_dirs = list((tmp_root / 'backup').iterdir()) if (tmp_root / 'backup').exists() else []
+        assert all(not any(d.iterdir()) for d in backup_dirs)
+
+    def test_no_groups_is_a_no_op(self, tmp_root):
+        check = _make_check(tmp_root)
+        check.picture_entries = {}
+
+        check._handle_groups([], dry_run=False)
+
+        assert not (tmp_root / 'backup').exists()

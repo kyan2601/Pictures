@@ -1,9 +1,10 @@
+import os
 from datetime import datetime
 
 import pytest
 from conftest import seed_media
 
-from src.classes.entities.EventsMetadataFile import EventsMetadataFile
+from src.classes.entities.EventsMetadataFile import EventsMetadataFile, _calculate_next_event_index
 from src.classes.entities.MetadataFile import MetadataFile
 
 
@@ -108,6 +109,59 @@ class TestCreateEventWithBackup:
         # No event was committed, and source metadata was left untouched.
         assert EventsMetadataFile.get_instance().df.empty
         assert set(MetadataFile.get_instance(2025).df['filepath']) == set(paths.values())
+
+
+class TestCalculateNextEventIndex:
+    def test_returns_one_when_no_existing_events(self, tmp_root):
+        assert _calculate_next_event_index('2025', '06') == 1
+
+    def test_returns_max_plus_one(self, tmp_root):
+        (tmp_root / '2025' / '06_1_June_First').mkdir(parents=True)
+        (tmp_root / '2025' / '06_3_June_Third').mkdir(parents=True)
+
+        assert _calculate_next_event_index('2025', '06') == 4
+
+    def test_ignores_a_different_month(self, tmp_root):
+        (tmp_root / '2025' / '07_5_July_Other').mkdir(parents=True)
+
+        assert _calculate_next_event_index('2025', '06') == 1
+
+    def test_skips_malformed_folder_names_without_crashing(self, tmp_root):
+        (tmp_root / '2025' / '06_2_June_Valid').mkdir(parents=True)
+        (tmp_root / '2025' / '06_abc_June_Malformed').mkdir(parents=True)
+
+        assert _calculate_next_event_index('2025', '06') == 3
+
+    def test_ignores_non_directory_matches(self, tmp_root):
+        (tmp_root / '2025').mkdir(parents=True)
+        (tmp_root / '2025' / '06_9_stray_file.txt').write_bytes(b'x')
+
+        assert _calculate_next_event_index('2025', '06') == 1
+
+
+class TestMultiYearEvent:
+    def test_event_spanning_two_years_files_both_under_the_start_year(self, tmp_root, events_file):
+        # An event's physical folder lives under its start year, so all associated
+        # media -- even media that started out in a different year's metadata.csv --
+        # ends up filed under the start year's metadata.csv too. The other year's
+        # metadata.csv loses those rows entirely (not just their filepaths).
+        seed_media(tmp_root, 2024, 12, [('241231001.jpg', datetime(2024, 12, 31, 20, 0))])
+        seed_media(tmp_root, 2025, 1, [('250101001.jpg', datetime(2025, 1, 1, 0, 30))])
+
+        emf = EventsMetadataFile.get_instance()
+        event = emf.create_event(title='New Years', start_date='2024-12-31', end_date='2025-01-01')
+
+        event_dir = tmp_root / '2024' / '12_1_December_New_Years'
+        assert (event_dir / '241231001.jpg').exists()
+        assert (event_dir / '250101001.jpg').exists()
+
+        mf_2024 = MetadataFile.get_instance(2024)
+        mf_2025 = MetadataFile.get_instance(2025)
+
+        assert set(mf_2024.df['filepath']) == {
+            str(event_dir / '241231001.jpg'), str(event_dir / '250101001.jpg')}
+        assert (mf_2024.df['event_id'] == event.event_id).all()
+        assert mf_2025.df.empty
 
 
 class TestCreateEventWithoutBackup:

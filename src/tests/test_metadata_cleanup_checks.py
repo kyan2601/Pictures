@@ -3,9 +3,16 @@ from datetime import datetime
 
 import pytest
 from conftest import seed_media
+from PIL import Image
 
 from src.classes.entities.MetadataFile import MetadataFile
 from src.classes.workflows.MetadataCleanupChecks import MetadataCleanupChecks
+
+
+def _write_png(path):
+    # PNG needs no EXIF and has no external-binary dependency, so a real file here
+    # exercises the real media_class_factory extraction path with zero fragility.
+    Image.new('RGB', (4, 4), color=(255, 0, 0)).save(str(path), 'PNG')
 
 
 class TestNoIssues:
@@ -116,3 +123,88 @@ class TestRollbackOnFailure:
         # The in-memory metadata_file was reloaded from the (untouched) disk state.
         reloaded_paths = set(MetadataFile.get_instance(2025).df['filepath'])
         assert reloaded_paths == set(paths.values())
+
+
+class TestCheckForUnindexedMedia:
+    def test_indexes_files_found_on_disk_but_missing_from_metadata(self, tmp_root):
+        MetadataFile.get_instance(2025)  # ensures the (empty) metadata file exists
+        month_dir = tmp_root / '2025' / '06'
+        month_dir.mkdir(parents=True)
+        _write_png(month_dir / '250615001.png')
+
+        checker = MetadataCleanupChecks(year=2025)
+        result = checker._check_for_unindexed_media(dry_run=False)
+
+        assert result is False
+        mf = MetadataFile.get_instance(2025)
+        assert str(month_dir / '250615001.png') in set(mf.df['filepath'])
+
+    def test_dry_run_detects_but_does_not_index(self, tmp_root):
+        MetadataFile.get_instance(2025)
+        month_dir = tmp_root / '2025' / '06'
+        month_dir.mkdir(parents=True)
+        _write_png(month_dir / '250615001.png')
+
+        checker = MetadataCleanupChecks(year=2025)
+        result = checker._check_for_unindexed_media(dry_run=True)
+
+        assert result is False
+        assert MetadataFile.get_instance(2025).df.empty
+
+    def test_returns_true_when_nothing_unindexed(self, tmp_root):
+        seed_media(tmp_root, 2025, 6, [('250615001.jpg', datetime(2025, 6, 15, 9, 0))])
+
+        checker = MetadataCleanupChecks(year=2025)
+        assert checker._check_for_unindexed_media(dry_run=False) is True
+
+    def test_backs_up_metadata_before_modifying(self, tmp_root):
+        seed_media(tmp_root, 2025, 6, [('250615001.jpg', datetime(2025, 6, 15, 9, 0))])
+        month_dir = tmp_root / '2025' / '06'
+        _write_png(month_dir / '250615002.png')
+
+        checker = MetadataCleanupChecks(year=2025)
+        checker._check_for_unindexed_media(dry_run=False)
+
+        backup_dirs = list((tmp_root / 'backup').iterdir())
+        assert len(backup_dirs) == 1
+        assert (backup_dirs[0] / 'metadata.csv').exists()
+
+
+class TestCheckForDeletedMedia:
+    def test_removes_metadata_for_files_no_longer_on_disk(self, tmp_root):
+        paths = seed_media(tmp_root, 2025, 6, [('250615001.jpg', datetime(2025, 6, 15, 9, 0))])
+        os.remove(paths['250615001.jpg'])
+
+        checker = MetadataCleanupChecks(year=2025)
+        result = checker._check_for_deleted_media(dry_run=False)
+
+        assert result is False
+        assert MetadataFile.get_instance(2025).df.empty
+
+    def test_dry_run_detects_but_does_not_modify(self, tmp_root):
+        paths = seed_media(tmp_root, 2025, 6, [('250615001.jpg', datetime(2025, 6, 15, 9, 0))])
+        os.remove(paths['250615001.jpg'])
+
+        checker = MetadataCleanupChecks(year=2025)
+        result = checker._check_for_deleted_media(dry_run=True)
+
+        assert result is False
+        assert not MetadataFile.get_instance(2025).df.empty
+
+    def test_returns_true_when_nothing_deleted(self, tmp_root):
+        seed_media(tmp_root, 2025, 6, [('250615001.jpg', datetime(2025, 6, 15, 9, 0))])
+
+        checker = MetadataCleanupChecks(year=2025)
+        assert checker._check_for_deleted_media(dry_run=False) is True
+
+    def test_saves_deleted_rows_to_a_backup_csv(self, tmp_root):
+        paths = seed_media(tmp_root, 2025, 6, [('250615001.jpg', datetime(2025, 6, 15, 9, 0))])
+        os.remove(paths['250615001.jpg'])
+
+        checker = MetadataCleanupChecks(year=2025)
+        checker._check_for_deleted_media(dry_run=False)
+
+        backup_dirs = list((tmp_root / 'backup').iterdir())
+        assert len(backup_dirs) == 1
+        deleted_csv = backup_dirs[0] / 'deleted_metadata_2025.csv'
+        assert deleted_csv.exists()
