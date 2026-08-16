@@ -59,7 +59,7 @@ class DuplicateImageCheck:
         bpp = filesize / max(1, width * height)
 
         ext = helper.decompose_filepath(filepath)['ext'].lower()
-        filesize_weight = self.WEIGHT_FILESIZE_HEIC if ext in ('.heic', '.heif') else self.WEIGHT_FILESIZE_DEFAULT
+        filesize_weight = self.WEIGHT_FILESIZE_HEIC if ext == constants.PictureExtension.HEIC.value else self.WEIGHT_FILESIZE_DEFAULT
 
         return round(self.WEIGHT_MEGAPIXELS * megapixels + filesize_weight * bpp, 2)
 
@@ -236,8 +236,8 @@ class DuplicateImageCheck:
         if dry_run:
             print("\nDRY RUN COMPLETE. No files were deleted.")
         else:
-            print("\nDuplicate removal complete.")
-            print("\nIMPORTANT: Please double check and run MetadataCleanupChecks to update metadata!")
+            print("\nDuplicate removal complete!")
+            print("\nIMPORTANT: Please double check and run MetadataCleanupChecks to update metadata.")
 
 
 if __name__ == '__main__':
