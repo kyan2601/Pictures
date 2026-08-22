@@ -37,14 +37,44 @@ def try_except(success, failure, *exceptions):
 def keyword_is_name(keyword):
     """
     Check if a keyword matches the pattern of a person's name (e.g., "JohnSmith").
-    
+
     Args:
         keyword: String to check
-        
+
     Returns:
         bool: True if keyword matches name pattern
     """
     return bool(re.match("[A-Z][a-z]+[A-Z][a-z]+", keyword))
+
+
+def identify_live_photo_movies(filepaths):
+    """
+    Given a list of media filepaths, returns the '.mov' files that share a base
+    filename with a picture also in the list -- Apple's Live Photo convention, where
+    the video is redundant motion data alongside the still image.
+
+    Args:
+        filepaths: List of media filepaths to check for Live Photo pairs
+
+    Returns:
+        list[str]: Sorted '.mov' filepaths identified as Live Photo sidecars
+    """
+    grouped = {}
+    for filepath in filepaths:
+        base_filepath, ext = filepath.rsplit('.', 1)
+        ext = ext.lower()
+        entry = grouped.setdefault(base_filepath, {'pictures': [], 'movs': []})
+        if ext in constants.PICTURE_EXTENSIONS:
+            entry['pictures'].append(filepath)
+        elif ext == constants.VideoExtension.MOV.value:
+            entry['movs'].append(filepath)
+
+    live_photo_movies = []
+    for entry in grouped.values():
+        if entry['pictures'] and entry['movs']:
+            live_photo_movies.extend(entry['movs'])
+
+    return sorted(live_photo_movies)
 
 
 #####################################

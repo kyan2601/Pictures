@@ -111,3 +111,22 @@ class TestCleanupBackups:
         cli.main(['cleanup-backups', '--retention-days', '7'])
 
         assert calls == [{'dry_run': True, 'retention_days': 7}]
+
+
+class TestAssignDate:
+    def test_defaults_to_dry_run(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AssignDate', fake)
+
+        cli.main(['assign-date', '--files', 'a.jpg', 'b.jpg', '--date', '2025-06-15'])
+
+        assert fake.instances[0].kwargs == {'dry_run': True}
+        assert fake.instances[0].run_calls == [((['a.jpg', 'b.jpg'], '2025-06-15'), {})]
+
+    def test_execute_flag_disables_dry_run(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AssignDate', fake)
+
+        cli.main(['assign-date', '--files', 'a.jpg', '--date', '2025-06-15', '--execute'])
+
+        assert fake.instances[0].kwargs == {'dry_run': False}

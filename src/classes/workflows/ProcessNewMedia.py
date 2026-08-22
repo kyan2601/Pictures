@@ -69,47 +69,22 @@ class ProcessNewMedia:
             pt.add_row([ext, count])
         print(pt)
 
-        grouped_filenames = {}
-        for filepath in media_filepaths:
-            fname, ext = filepath.rsplit('.', 1)
-            if fname not in grouped_filenames:
-                grouped_filenames[fname] = {
-                    'picture_extensions': [],
-                    'video_extensions': [],
-                }
-            if ext.lower() in constants.PICTURE_EXTENSIONS:
-                grouped_filenames[fname]['picture_extensions'].append(ext.lower())
-            elif ext.lower() in constants.VIDEO_EXTENSIONS:
-                grouped_filenames[fname]['video_extensions'].append(ext.lower())
-            else:
-                raise ValueError(f"[!!!] Unknown extension {ext} in {filepath}")
-
-        live_photos = []
-        for base_filepath in grouped_filenames.keys():
-            if grouped_filenames[base_filepath]['picture_extensions'] and \
-                    (constants.VideoExtension.MOV.name.lower() in grouped_filenames[base_filepath]['video_extensions'] or
-                     constants.VideoExtension.MOV.value.lower() in grouped_filenames[base_filepath]['video_extensions']):
-                # live photo identified; image file is accompanied by an .mov
-                live_photos.append(base_filepath)
+        live_photo_movies = helper.identify_live_photo_movies(media_filepaths)
 
         if self.dry_run:
-            self._print_and_log(f"DRY RUN: Would move {len(live_photos)} live photo movies to backup")
+            self._print_and_log(f"DRY RUN: Would move {len(live_photo_movies)} live photo movies to backup")
             return
 
-        print(f"[-] Moving {len(live_photos)} live photo movies to backup...")
+        print(f"[-] Moving {len(live_photo_movies)} live photo movies to backup...")
 
         backup_dir = helper.create_backup_directory('live_photo_removal')
         moved_count = 0
-        for base_filepath in live_photos:
-            ext = constants.VideoExtension.MOV.name.lower() \
-                if constants.VideoExtension.MOV.name.lower() in grouped_filenames[base_filepath]['video_extensions'] \
-                else constants.VideoExtension.MOV.value.lower()
-            mov_filepath = f'{base_filepath}.{ext}'
+        for mov_filepath in live_photo_movies:
             if os.path.exists(mov_filepath):
                 shutil.move(mov_filepath, backup_dir)
                 moved_count += 1
                 print(f'[-] Moved live photo movie to backup: {mov_filepath}')
-        
+
         self._print_and_log(f"Finished moving {moved_count} live photo movies to backup.")
 
     def _sort_and_rename_new_pictures(self):
