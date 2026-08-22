@@ -85,3 +85,29 @@ class TestFindDuplicates:
         cli.main(['find-duplicates', '--year', '2025', '--execute'])
 
         assert fake.instances[0].run_calls == [((), {'dry_run': False})]
+
+
+class TestCleanupBackups:
+    def test_defaults_to_dry_run_and_thirty_days(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(cli, 'cleanup_backups_main', lambda **kwargs: calls.append(kwargs))
+
+        cli.main(['cleanup-backups'])
+
+        assert calls == [{'dry_run': True, 'retention_days': 30}]
+
+    def test_execute_flag_disables_dry_run(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(cli, 'cleanup_backups_main', lambda **kwargs: calls.append(kwargs))
+
+        cli.main(['cleanup-backups', '--execute'])
+
+        assert calls == [{'dry_run': False, 'retention_days': 30}]
+
+    def test_retention_days_is_passed_through(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(cli, 'cleanup_backups_main', lambda **kwargs: calls.append(kwargs))
+
+        cli.main(['cleanup-backups', '--retention-days', '7'])
+
+        assert calls == [{'dry_run': True, 'retention_days': 7}]

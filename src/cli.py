@@ -1,6 +1,7 @@
 import argparse
 
 from src import helper
+from src.adhoc.cleanup_backups import main as cleanup_backups_main
 from src.classes.workflows.DuplicateImageCheck import DuplicateImageCheck
 from src.classes.workflows.MetadataCleanupChecks import MetadataCleanupChecks
 from src.classes.workflows.ProcessNewMedia import ProcessNewMedia
@@ -19,6 +20,10 @@ def _find_duplicates(args):
     directory = helper.get_directory_for_year_month(args.year, args.month) if args.month \
         else helper.get_directory_for_year(args.year)
     DuplicateImageCheck(directory).run(dry_run=not args.execute)
+
+
+def _cleanup_backups(args):
+    cleanup_backups_main(dry_run=not args.execute, retention_days=args.retention_days)
 
 
 def main(argv=None):
@@ -42,6 +47,13 @@ def main(argv=None):
     dup_parser.add_argument('--month', type=int, help='Month to search (defaults to the whole year).')
     dup_parser.add_argument('--execute', action='store_true', help='Apply changes (default is dry run).')
     dup_parser.set_defaults(func=_find_duplicates)
+
+    cleanup_backups_parser = subparsers.add_parser(
+        'cleanup-backups', help='Delete backup directories older than the retention period.')
+    cleanup_backups_parser.add_argument(
+        '--retention-days', type=int, default=30, help='Age threshold in days (default: 30).')
+    cleanup_backups_parser.add_argument('--execute', action='store_true', help='Apply changes (default is dry run).')
+    cleanup_backups_parser.set_defaults(func=_cleanup_backups)
 
     args = parser.parse_args(argv)
     args.func(args)
