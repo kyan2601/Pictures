@@ -142,7 +142,7 @@ def get_year_from_filepath(filepath):
 
     dirname = decompose_filepath(filepath)['dirname']
     try:
-        relative_path = dirname.replace(constants.ROOT_DIR, '').strip(os.sep)
+        relative_path = os.path.relpath(dirname, constants.ROOT_DIR)
         year = int(relative_path[:4])
     except Exception as e:
         raise RuntimeError(f"Could not extract year from filepath [{filepath}]: {e}")
@@ -197,7 +197,8 @@ def serialize_filepath(filepath, delimiter='|/'):
     Returns:
         str: Serialized filepath
     """
-    return delimiter.join(filepath.replace(constants.ROOT_DIR, '').strip(os.sep).split(os.sep))
+    relative_path = os.path.relpath(filepath, constants.ROOT_DIR)
+    return delimiter.join(relative_path.split(os.sep))
 
 
 def deserialize_filepath(filepath, delimiter='|/'):
@@ -211,7 +212,7 @@ def deserialize_filepath(filepath, delimiter='|/'):
     Returns:
         str: Full file path
     """
-    return os.sep.join([constants.ROOT_DIR] + filepath.split(delimiter))
+    return os.path.join(constants.ROOT_DIR, *filepath.split(delimiter))
 
 
 #####################################
