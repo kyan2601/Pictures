@@ -20,14 +20,14 @@ def _fresh_fake_class():
 
 
 class TestProcessNew:
-    def test_defaults_to_dry_run(self, monkeypatch):
+    def test_defaults_to_dry_run_and_no_directory_override(self, monkeypatch):
         fake = _fresh_fake_class()
         monkeypatch.setattr(cli, 'ProcessNewMedia', fake)
 
         cli.main(['process-new'])
 
         assert len(fake.instances) == 1
-        assert fake.instances[0].kwargs == {'dry_run': True}
+        assert fake.instances[0].kwargs == {'dry_run': True, 'directory': None}
         assert fake.instances[0].run_calls == [((), {})]
 
     def test_execute_flag_disables_dry_run(self, monkeypatch):
@@ -36,7 +36,15 @@ class TestProcessNew:
 
         cli.main(['process-new', '--execute'])
 
-        assert fake.instances[0].kwargs == {'dry_run': False}
+        assert fake.instances[0].kwargs == {'dry_run': False, 'directory': None}
+
+    def test_directory_flag_is_passed_through(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'ProcessNewMedia', fake)
+
+        cli.main(['process-new', '--directory', 'new/some_import'])
+
+        assert fake.instances[0].kwargs == {'dry_run': True, 'directory': 'new/some_import'}
 
 
 class TestCleanup:

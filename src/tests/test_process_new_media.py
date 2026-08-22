@@ -120,6 +120,42 @@ class TestIdentifyLivePhotoMovies:
         assert (new_dir / 'clip.mov').exists()
 
 
+class TestDirectoryScoping:
+    def test_defaults_to_new_media_dir(self, tmp_root):
+        pnm = ProcessNewMedia(dry_run=True)
+        assert pnm.directory == str(tmp_root / 'new')
+
+    def test_explicit_directory_overrides_default(self, tmp_root):
+        subdir = tmp_root / 'new' / 'pending_import_1'
+        pnm = ProcessNewMedia(dry_run=True, directory=str(subdir))
+        assert pnm.directory == str(subdir)
+
+    def test_sort_only_processes_the_given_subdirectory(self, tmp_root, monkeypatch):
+        # new/ can have multiple unrelated pending imports side by side -- scoping to
+        # one subdirectory must not sweep in files from another.
+        import_1_dir = tmp_root / 'new' / 'pending_import_1'
+        import_1_dir.mkdir(parents=True)
+        (import_1_dir / 'a.jpg').write_bytes(b'import_1')
+
+        import_2_dir = tmp_root / 'new' / 'pending_import_2'
+        import_2_dir.mkdir(parents=True)
+        (import_2_dir / 'b.jpg').write_bytes(b'import_2')
+
+        a_path, b_path = str(import_1_dir / 'a.jpg'), str(import_2_dir / 'b.jpg')
+        monkeypatch.setattr(
+            pnm_module.media_class_factory, 'create_media_entry',
+            _fake_factory(
+                {a_path: datetime(2025, 6, 15, 10, 0), b_path: datetime(2025, 7, 1, 10, 0)},
+                {a_path: constants.PictureExtension.JPG, b_path: constants.PictureExtension.JPG}))
+
+        pnm = ProcessNewMedia(dry_run=False, directory=str(import_1_dir))
+        pnm._sort_and_rename_new_pictures()
+
+        assert (tmp_root / '2025' / '06' / '250615001.jpg').read_bytes() == b'import_1'
+        assert not (tmp_root / '2025' / '07').exists()
+        assert (import_2_dir / 'b.jpg').exists()  # untouched, outside the scoped directory
+
+
 class TestSortAndRenameNewPictures:
     def test_assigns_indices_in_datetime_order_not_filename_order(self, tmp_root, monkeypatch):
         new_dir = tmp_root / 'new'

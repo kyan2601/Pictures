@@ -9,7 +9,7 @@ from src.classes.workflows.ProcessNewMedia import ProcessNewMedia
 
 
 def _process_new(args):
-    ProcessNewMedia(dry_run=not args.execute).run()
+    ProcessNewMedia(dry_run=not args.execute, directory=args.directory).run()
 
 
 def _cleanup(args):
@@ -37,6 +37,8 @@ def main(argv=None):
 
     process_new_parser = subparsers.add_parser(
         'process-new', help="Ingest and sort files from the 'new/' directory.")
+    process_new_parser.add_argument(
+        '--directory', help="Directory to process (defaults to the whole 'new/' directory).")
     process_new_parser.add_argument('--execute', action='store_true', help='Apply changes (default is dry run).')
     process_new_parser.set_defaults(func=_process_new)
 

@@ -11,8 +11,9 @@ from src.classes.entities.MetadataFile import MetadataFile
 
 
 class ProcessNewMedia:
-    def __init__(self, dry_run=True):
+    def __init__(self, dry_run=True, directory=None):
         self.dry_run = dry_run
+        self.directory = directory or constants.NEW_MEDIA_DIR
         self.run_log = []
         self.media = []
 
@@ -22,11 +23,11 @@ class ProcessNewMedia:
 
     def _delete_dot_underscore_files(self):
         """
-        Deletes (moves to backup) all files starting with '._' in the NEW_MEDIA_DIR.
+        Deletes (moves to backup) all files starting with '._' in self.directory.
         These are typically AppleDouble files.
         """
         dot_underscore_files = []
-        for root, _, files in os.walk(constants.NEW_MEDIA_DIR):
+        for root, _, files in os.walk(self.directory):
             for file in files:
                 if file.startswith('._'):
                     dot_underscore_files.append(os.path.join(root, file))
@@ -54,7 +55,7 @@ class ProcessNewMedia:
         self._print_and_log(f"Finished moving {moved_count} '._' files to backup.")
 
     def _identify_live_photo_movies(self):
-        media_filepaths = helper.get_filepaths_by_directory(constants.NEW_MEDIA_DIR, ignore_new_media=False)
+        media_filepaths = helper.get_filepaths_by_directory(self.directory, ignore_new_media=False)
 
         if len(media_filepaths) == 0:
             self._print_and_log("No new files to work with.")
@@ -88,7 +89,7 @@ class ProcessNewMedia:
         self._print_and_log(f"Finished moving {moved_count} live photo movies to backup.")
 
     def _sort_and_rename_new_pictures(self):
-        media_filepaths = helper.get_filepaths_by_directory(constants.NEW_MEDIA_DIR, ignore_new_media=False)
+        media_filepaths = helper.get_filepaths_by_directory(self.directory, ignore_new_media=False)
 
         if len(media_filepaths) == 0:
             self._print_and_log("No new files found to sort.")
