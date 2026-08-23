@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duplicate check — 2022-05 — Pictures Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Manrope:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #17151a;
+  --surface: #201d24;
+  --surface-hover: #29252d;
+  --border: #322e38;
+  --text: #ede9e4;
+  --text-muted: #9891a0;
+  --accent: #4c7fd6;
+  --keep: #5fa575;
+  --remove: #c9605a;
+  --unsure: #d6a34c;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: 'Manrope', -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+header.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.9rem 1.75rem;
+  background: rgba(23, 21, 26, 0.94);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+
+header.site-header .site-title {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600;
+  font-size: 1.2rem;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  text-decoration: none;
+}
+
+header.site-header .crumb-sep {
+  color: var(--text-muted);
+}
+
+header.site-header .crumb {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+header.site-header .crumb.current {
+  color: var(--text);
+}
+
+main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1.75rem 4rem;
+}
+
+section.group, section.category {
+  margin-bottom: 2.75rem;
+}
+
+.group-heading, .category-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+.group-count, .category-count {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.group-note {
+  margin: 0 0 1.1rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  max-width: 65ch;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .page-row { transition: none; }
+}
+
+.card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.card .thumb-link {
+  display: block;
+  aspect-ratio: 1 / 1;
+  background: #0f0e11;
+}
+
+.card .thumb-link img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.card .meta {
+  padding: 0.55rem 0.65rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.card .filename {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card .label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.card .label {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: var(--text);
+}
+
+.chip {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.chip.keep { color: var(--keep); background: color-mix(in srgb, var(--keep) 16%, transparent); }
+.chip.remove { color: var(--remove); background: color-mix(in srgb, var(--remove) 16%, transparent); }
+.chip.unsure { color: var(--unsure); background: color-mix(in srgb, var(--unsure) 16%, transparent); }
+
+/* index page */
+.page-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: 720px;
+}
+
+.page-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.page-row:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.page-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.page-row .page-row-title {
+  font-weight: 600;
+}
+
+.page-row .page-row-meta {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.review-pending {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.page-row .chip {
+  flex-shrink: 0;
+}
+
+.empty-state {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+</style>
+</head>
+<body>
+<header class="site-header">
+  <a class="site-title crumb" href="../index.html">Pictures Review</a>
+  <span class="crumb-sep">/</span>
+  <span class="crumb">Duplicate Check</span>
+  <span class="crumb-sep">/</span>
+  <span class="crumb current">Duplicate check — 2022-05</span>
+</header>
+<main>
+<section class="group">
+  <h2 class="group-heading">Group 1 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520012.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/a80de5b901a55f1a.jpg" alt="220520012.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520012.JPG</span>
+    <div class="label-row"><span class="label">Score 12.20</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520013.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/a4a83ad7ee49a871.jpg" alt="220520013.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520013.JPG</span>
+    <div class="label-row"><span class="label">Score 12.20</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 2 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520062.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/9ce91df39e2dbdbc.jpg" alt="220520062.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520062.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.23</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520067.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/328a0095539c775b.jpg" alt="220520067.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520067.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.23</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 3 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520064.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/ec77b3f1ba2bab39.jpg" alt="220520064.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520064.JPG</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520065.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/db52d6c6c3b1ffa3.jpg" alt="220520065.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520065.JPG</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 4 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520072.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/317752c95e112712.jpg" alt="220520072.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520072.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.23</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520077.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/1a43490fc8174b43.jpg" alt="220520077.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520077.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.23</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 5 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520095.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/e3dafa6db5ca2625.jpg" alt="220520095.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520095.JPG</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520096.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/f21e1e6dcc9da441.jpg" alt="220520096.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520096.JPG</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 6 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520104.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/18d58098a34c3f96.jpg" alt="220520104.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520104.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.23</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520105.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/626c54d28e9fbba0.jpg" alt="220520105.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520105.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.23</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 7 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520106.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/b73f4cde2a5ebc56.jpg" alt="220520106.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520106.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.23</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520107.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/67a9c5ecb6827a78.jpg" alt="220520107.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520107.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.23</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 8 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520121.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/999f56f7756f9a0d.jpg" alt="220520121.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520121.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520122.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/3f2f6344143840f2.jpg" alt="220520122.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520122.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 9 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520129.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/9b8031d8f2b060b1.jpg" alt="220520129.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520129.JPG</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520130.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/5e34eed11face6be.jpg" alt="220520130.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520130.JPG</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 10 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520137.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/e0b9d557a44b270f.jpg" alt="220520137.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520137.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.20</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520138.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/982251936a589a51.jpg" alt="220520138.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520138.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.20</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 11 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520141.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/55ab0848deb32a29.jpg" alt="220520141.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520141.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.23</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520142.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/ec6e4aded8e6cb0c.jpg" alt="220520142.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520142.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.23</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 12 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220521024.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/68bbb3e19f0d61af.jpg" alt="220521024.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220521024.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220521025.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/c70a4096b51d514f.jpg" alt="220521025.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220521025.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 13 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220521036.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/00295e0949dac150.jpg" alt="220521036.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220521036.JPG</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220521038.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/ac15e6e0c7597f04.jpg" alt="220521038.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220521038.JPG</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 14 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220522026.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/f13c333a6101f4c6.jpg" alt="220522026.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522026.JPG</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220522031.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/b66ca9a5b7add478.jpg" alt="220522031.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522031.JPG</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 15 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220522082.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/a9a0a4dc130d7fe3.jpg" alt="220522082.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522082.JPG</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220522083.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/0d5f629242ff7e77.jpg" alt="220522083.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522083.JPG</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 16 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220522085.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/a857e8ba3749469b.jpg" alt="220522085.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522085.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220522086.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/e7db4a02b9521b1c.jpg" alt="220522086.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522086.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 17 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220522088.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/971f332e994fd71f.jpg" alt="220522088.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522088.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220522089.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/fe400e7730b2786a.jpg" alt="220522089.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522089.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 18 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220522135.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/1c180a388d4b0dd3.jpg" alt="220522135.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522135.JPG</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220522136.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/c37828785b16a372.jpg" alt="220522136.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522136.JPG</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 19 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220522141.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/93a0bab4a07bc034.jpg" alt="220522141.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522141.JPG</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220522142.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/ef085edb38eaf2c7.jpg" alt="220522142.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522142.JPG</span>
+    <div class="label-row"><span class="label">Score 12.22</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 20 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220522155.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/d54304b862ebee0d.jpg" alt="220522155.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522155.JPG</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220522157.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/11e870ef9f7ffcae.jpg" alt="220522157.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522157.JPG</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 21 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220522161.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/dc5a03fb6e692ea8.jpg" alt="220522161.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522161.JPG</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220522162.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/4982c0e99770325b.jpg" alt="220522162.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522162.JPG</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 22 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220523031.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/09710a1e49234e6e.jpg" alt="220523031.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220523031.JPG</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220523032.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/037fbf8711036397.jpg" alt="220523032.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220523032.JPG</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 23 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520008.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/04d7fc9869c3077f.jpg" alt="220520008.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520008.JPG</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520009.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/67f656bcdbbb416f.jpg" alt="220520009.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520009.JPG</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 24 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520073.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/d998074818ef8e76.jpg" alt="220520073.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520073.HEIC</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520074.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/52171743809f754f.jpg" alt="220520074.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520074.HEIC</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 25 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520089.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/5f099b90663eae1f.jpg" alt="220520089.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520089.HEIC</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520090.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/3ece9d8788a5850e.jpg" alt="220520090.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520090.HEIC</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 26 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520098.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/81766fa92fbacd27.jpg" alt="220520098.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520098.HEIC</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520099.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/b8db9081c7f7511a.jpg" alt="220520099.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520099.HEIC</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 27 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220520123.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/4b04de5156c8202c.jpg" alt="220520123.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520123.HEIC</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220520126.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/c138bba8b49bbd2f.jpg" alt="220520126.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220520126.HEIC</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 28 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220521020.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/75788305f8257d0c.jpg" alt="220521020.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220521020.HEIC</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220521021.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/03dae221b269d0a2.jpg" alt="220521021.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220521021.HEIC</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 29 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220522010.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/1f43e2dff124e62f.jpg" alt="220522010.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522010.HEIC</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220522011.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/9854a6aa3c34f3ab.jpg" alt="220522011.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522011.HEIC</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 30 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220522029.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/bce70dd38ac549fd.jpg" alt="220522029.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522029.JPG</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220522034.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/bdf56e6db4be9909.jpg" alt="220522034.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522034.JPG</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 31 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220522055.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/d6c4eac7c9cd0214.jpg" alt="220522055.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522055.JPG</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220522057.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/7a20e33e41fa9f8d.jpg" alt="220522057.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522057.JPG</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 32 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220522060.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/e08e8780a81b0c84.jpg" alt="220522060.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522060.JPG</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220522061.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/fc5b2ffa95ee8c74.jpg" alt="220522061.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522061.JPG</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 33 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220522112.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/e5f859c8482df676.jpg" alt="220522112.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522112.JPG</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220522113.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/d0c71ee602c50bfc.jpg" alt="220522113.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220522113.JPG</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 34 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220523007.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/ad1b83a6df4a6227.jpg" alt="220523007.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220523007.JPG</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220523008.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/ac14fa9b77eade30.jpg" alt="220523008.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220523008.HEIC</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 35 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2022/05/220528021.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/4115e7cc3f1c487e.jpg" alt="220528021.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220528021.HEIC</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2022/05/220528022.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/8e903fdfca30d093.jpg" alt="220528022.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">220528022.HEIC</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+</main>
+</body>
+</html>

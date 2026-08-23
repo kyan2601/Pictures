@@ -23,6 +23,7 @@ def tmp_root(tmp_path, monkeypatch):
     monkeypatch.setattr(constants, 'ROOT_DIR', str(tmp_path))
     monkeypatch.setattr(constants, 'NEW_MEDIA_DIR', str(tmp_path / 'new'))
     monkeypatch.setattr(constants, 'BACKUP_DIR', str(tmp_path / 'backup'))
+    monkeypatch.setattr(constants, 'REVIEW_DIR', str(tmp_path / 'review'))
 
     MetadataFile._instances = {}
     yield tmp_path

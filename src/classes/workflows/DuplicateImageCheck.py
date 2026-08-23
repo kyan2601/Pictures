@@ -10,6 +10,7 @@ from pillow_heif import register_heif_opener
 from src import helper, constants
 from src.classes import media_class_factory
 from src.classes.entities.PictureEntry import PictureEntry
+from src.classes.workflows.GallerySite import GallerySite
 
 register_heif_opener()
 
@@ -171,6 +172,8 @@ class DuplicateImageCheck:
         # Sort by similarity tier, highest value first
         all_categorized_subgroups.sort(key=lambda item: item[0].value, reverse=True)
 
+        gallery_sections = []
+
         for i, (tag, imgs) in enumerate(all_categorized_subgroups):
             if tag in [self.SimilarityTiers.DUPLICATE]:
                 scores = {p: self._compute_quality_score(p) for p in imgs}
@@ -179,6 +182,7 @@ class DuplicateImageCheck:
                 actions = {}
 
                 print(f"\nGROUP {i + 1}: [Tier {tag.value} - {tag.name} IMAGES]")
+                gallery_items = []
                 for p, s in sorted(scores.items(), key=lambda item: item[1], reverse=True):
                     action = ""
                     if len(best_images) > 1:
@@ -193,6 +197,12 @@ class DuplicateImageCheck:
                         raise RuntimeError(f"Not possible, shouldn't logically be able to get here")
                     actions[p] = action
                     print(f"  [{action}] {p} (Score: {s:.2f})")
+                    gallery_items.append({'filepath': p, 'label': f'Score {s:.2f}', 'tag': action.lower()})
+
+                gallery_sections.append({
+                    'heading': f'Group {i + 1} — Duplicate',
+                    'items': gallery_items,
+                })
 
                 if not dry_run and "REMOVE" in actions.values():
                     for p, action in actions.items():
@@ -208,8 +218,23 @@ class DuplicateImageCheck:
                 for img in imgs:
                     print(f"  - {img}")
 
+                gallery_sections.append({
+                    'heading': f'Group {i + 1} — Similar (review manually)',
+                    'items': [{'filepath': img} for img in imgs],
+                })
+
             else:
                 raise ValueError(f"Unrecognized tag: {tag}")
+
+        if gallery_sections:
+            page_id = os.path.relpath(self.directory_path, constants.ROOT_DIR).replace(os.sep, '-')
+            page_path = GallerySite(constants.REVIEW_DIR).add_page(
+                category='duplicate-check',
+                page_id=page_id,
+                title=f'Duplicate check — {page_id}',
+                sections=gallery_sections,
+            )
+            print(f"\n[-] Review page written: {page_path}")
 
     def run(self, dry_run: bool = True):
         """

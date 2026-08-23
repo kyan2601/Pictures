@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duplicate check — 2023-12 — Pictures Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Manrope:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #17151a;
+  --surface: #201d24;
+  --surface-hover: #29252d;
+  --border: #322e38;
+  --text: #ede9e4;
+  --text-muted: #9891a0;
+  --accent: #4c7fd6;
+  --keep: #5fa575;
+  --remove: #c9605a;
+  --unsure: #d6a34c;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: 'Manrope', -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+header.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.9rem 1.75rem;
+  background: rgba(23, 21, 26, 0.94);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+
+header.site-header .site-title {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600;
+  font-size: 1.2rem;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  text-decoration: none;
+}
+
+header.site-header .crumb-sep {
+  color: var(--text-muted);
+}
+
+header.site-header .crumb {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+header.site-header .crumb.current {
+  color: var(--text);
+}
+
+main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1.75rem 4rem;
+}
+
+section.group, section.category {
+  margin-bottom: 2.75rem;
+}
+
+.group-heading, .category-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+.group-count, .category-count {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.group-note {
+  margin: 0 0 1.1rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  max-width: 65ch;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .page-row { transition: none; }
+}
+
+.card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.card .thumb-link {
+  display: block;
+  aspect-ratio: 1 / 1;
+  background: #0f0e11;
+}
+
+.card .thumb-link img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.card .meta {
+  padding: 0.55rem 0.65rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.card .filename {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card .label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.card .label {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: var(--text);
+}
+
+.chip {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.chip.keep { color: var(--keep); background: color-mix(in srgb, var(--keep) 16%, transparent); }
+.chip.remove { color: var(--remove); background: color-mix(in srgb, var(--remove) 16%, transparent); }
+.chip.unsure { color: var(--unsure); background: color-mix(in srgb, var(--unsure) 16%, transparent); }
+
+/* index page */
+.page-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: 720px;
+}
+
+.page-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.page-row:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.page-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.page-row .page-row-title {
+  font-weight: 600;
+}
+
+.page-row .page-row-meta {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.review-pending {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.page-row .chip {
+  flex-shrink: 0;
+}
+
+.empty-state {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+</style>
+</head>
+<body>
+<header class="site-header">
+  <a class="site-title crumb" href="../index.html">Pictures Review</a>
+  <span class="crumb-sep">/</span>
+  <span class="crumb">Duplicate Check</span>
+  <span class="crumb-sep">/</span>
+  <span class="crumb current">Duplicate check — 2023-12</span>
+</header>
+<main>
+<section class="group">
+  <h2 class="group-heading">Group 1 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2023/12/231210003.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/2ad4f88e3888232f.jpg" alt="231210003.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">231210003.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2023/12/231210006.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/0be5b698516c3830.jpg" alt="231210006.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">231210006.HEIC</span>
+    <div class="label-row"><span class="label">Score 12.21</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 2 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2023/12/231224014.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/fea0964cae932e97.jpg" alt="231224014.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">231224014.JPG</span>
+    <div class="label-row"><span class="label">Score 12.65</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2023/12/231224015.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/6f4b069337c88e83.jpg" alt="231224015.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">231224015.JPG</span>
+    <div class="label-row"><span class="label">Score 12.65</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 3 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2023/12/231224017.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/ca09a80d8762ce88.jpg" alt="231224017.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">231224017.JPG</span>
+    <div class="label-row"><span class="label">Score 12.65</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2023/12/231224018.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/bbf0e93330b00f41.jpg" alt="231224018.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">231224018.JPG</span>
+    <div class="label-row"><span class="label">Score 12.65</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 4 — Duplicate <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2023/12/231230002.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/24f1994d96230e34.jpg" alt="231230002.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">231230002.JPG</span>
+    <div class="label-row"><span class="label">Score 15.96</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2023/12/231230003.JPG" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/38b3b630bca98e46.jpg" alt="231230003.JPG" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">231230003.JPG</span>
+    <div class="label-row"><span class="label">Score 15.96</span><span class="chip unsure">UNSURE</span></div>
+  </span>
+</a>
+  </div>
+</section>
+<section class="group">
+  <h2 class="group-heading">Group 5 — Similar (review manually) <span class="group-count">2 items</span></h2>
+  
+  <div class="grid">
+    <a class="card" href="file:///F:/Pictures/2023/12/231206002.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/13009aec72e1ad82.jpg" alt="231206002.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">231206002.HEIC</span>
+    
+  </span>
+</a>
+<a class="card" href="file:///F:/Pictures/2023/12/231206003.HEIC" target="_blank" rel="noopener">
+  <span class="thumb-link"><img src="../thumbnails/aa57ef57b0d79506.jpg" alt="231206003.HEIC" loading="lazy"></span>
+  <span class="meta">
+    <span class="filename">231206003.HEIC</span>
+    
+  </span>
+</a>
+  </div>
+</section>
+</main>
+</body>
+</html>

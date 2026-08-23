@@ -1,18 +1,24 @@
 import hashlib
 import html
+import json
 import os
 import webbrowser
+from datetime import datetime
 from pathlib import Path
 
 import ffmpeg
+import pandas as pd
 from PIL import Image
 from pillow_heif import register_heif_opener
 
-from src import constants
+from src import constants, helper
 
 register_heif_opener()
 
 THUMBNAIL_MAX_DIMENSION = 480
+MANIFEST_FILENAME = 'manifest.json'
+REVIEWS_FILENAME = 'reviews.csv'
+REVIEWS_COLS = ['filepath', 'last_reviewed']
 
 _TAG_LABELS = {'keep': 'KEEP', 'remove': 'REMOVE', 'unsure': 'UNSURE'}
 
@@ -51,6 +57,10 @@ def _make_thumbnail(filepath, thumbnail_path):
 
 def _file_uri(filepath):
     return Path(filepath).absolute().as_uri()
+
+
+def _category_label(category):
+    return category.replace('-', ' ').replace('_', ' ').title()
 
 
 _PAGE_CSS = """
@@ -93,7 +103,7 @@ header.site-header {
   z-index: 10;
   display: flex;
   align-items: baseline;
-  gap: 0.85rem;
+  gap: 0.6rem;
   padding: 0.9rem 1.75rem;
   background: rgba(23, 21, 26, 0.94);
   backdrop-filter: blur(6px);
@@ -113,9 +123,14 @@ header.site-header .crumb-sep {
   color: var(--text-muted);
 }
 
-header.site-header .page-title {
+header.site-header .crumb {
   color: var(--text-muted);
   font-size: 0.95rem;
+  text-decoration: none;
+}
+
+header.site-header .crumb.current {
+  color: var(--text);
 }
 
 main {
@@ -124,11 +139,11 @@ main {
   padding: 2rem 1.75rem 4rem;
 }
 
-section.group {
+section.group, section.category {
   margin-bottom: 2.75rem;
 }
 
-section.group .group-heading {
+.group-heading, .category-heading {
   display: flex;
   align-items: baseline;
   gap: 0.75rem;
@@ -138,14 +153,14 @@ section.group .group-heading {
   text-wrap: balance;
 }
 
-section.group .group-count {
+.group-count, .category-count {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-size: 0.8rem;
   font-weight: 400;
   color: var(--text-muted);
 }
 
-section.group .group-note {
+.group-note {
   margin: 0 0 1.1rem;
   color: var(--text-muted);
   font-size: 0.88rem;
@@ -169,7 +184,7 @@ section.group .group-note {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card { transition: none; }
+  .card, .page-row { transition: none; }
 }
 
 .card:hover {
@@ -243,7 +258,7 @@ section.group .group-note {
 
 .page-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   padding: 0.9rem 1.1rem;
@@ -255,24 +270,77 @@ section.group .group-note {
   transition: border-color 0.12s ease, background 0.12s ease;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .page-row { transition: none; }
-}
-
 .page-row:hover {
   border-color: var(--accent);
   background: var(--surface-hover);
+}
+
+.page-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
 }
 
 .page-row .page-row-title {
   font-weight: 600;
 }
 
-.page-row .page-row-count {
+.page-row .page-row-meta {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
+}
+
+.review-pending {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
   flex-shrink: 0;
+}
+
+.page-row .chip {
+  flex-shrink: 0;
+}
+
+.completed-disclosure {
+  margin-top: 0.9rem;
+}
+
+.completed-disclosure summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.4rem 0.1rem;
+  list-style: none;
+}
+
+.completed-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.completed-disclosure summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 0.4rem;
+  transition: transform 0.12s ease;
+}
+
+.completed-disclosure[open] summary::before {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .completed-disclosure summary::before { transition: none; }
+}
+
+.completed-disclosure summary:hover {
+  color: var(--text);
+}
+
+.completed-disclosure .page-list {
+  margin-top: 0.6rem;
 }
 
 .empty-state {
@@ -338,15 +406,18 @@ def _render_section(section):
 </section>"""
 
 
-def _render_page_html(site_title, title, sections):
+def _render_page_html(site_title, category, title, sections):
     body_sections = '\n'.join(_render_section(section) for section in sections) \
         or '<p class="empty-state">Nothing to show on this page.</p>'
+    category_label = html.escape(_category_label(category))
     return f"""{_render_head(title, site_title)}
 <body>
 <header class="site-header">
-  <a class="site-title" href="../index.html">{html.escape(site_title)}</a>
+  <a class="site-title crumb" href="../index.html">{html.escape(site_title)}</a>
   <span class="crumb-sep">/</span>
-  <span class="page-title">{html.escape(title)}</span>
+  <span class="crumb">{category_label}</span>
+  <span class="crumb-sep">/</span>
+  <span class="crumb current">{html.escape(title)}</span>
 </header>
 <main>
 {body_sections}
@@ -355,16 +426,60 @@ def _render_page_html(site_title, title, sections):
 </html>"""
 
 
-def _render_index_html(site_title, page_summaries):
-    if page_summaries:
-        rows = '\n'.join(
-            f'<a class="page-row" href="pages/{html.escape(p["page_id"])}.html">'
-            f'<span class="page-row-title">{html.escape(p["title"])}</span>'
-            f'<span class="page-row-count">{p["item_count"]} item{"s" if p["item_count"] != 1 else ""}</span>'
-            f'</a>'
-            for p in page_summaries
-        )
-        body = f'<div class="page-list">{rows}</div>'
+def _format_timestamp(iso_timestamp):
+    try:
+        return datetime.fromisoformat(iso_timestamp).strftime('%Y-%m-%d %H:%M')
+    except ValueError:
+        return iso_timestamp
+
+
+def _render_review_chip(last_reviewed):
+    if last_reviewed:
+        return f'<span class="chip keep">REVIEWED · {html.escape(_format_timestamp(last_reviewed))}</span>'
+    return '<span class="review-pending">Not reviewed</span>'
+
+
+def _render_page_row(category, p):
+    return f"""<a class="page-row" href="{html.escape(category)}/{html.escape(p['page_id'])}.html">
+  <span class="page-row-main">
+    <span class="page-row-title">{html.escape(p['title'])}</span>
+    <span class="page-row-meta">{p['item_count']} item{'s' if p['item_count'] != 1 else ''}
+      · updated {_format_timestamp(p['updated_at'])}</span>
+  </span>
+  {_render_review_chip(p.get('last_reviewed', ''))}
+</a>"""
+
+
+def _render_category_section(category, pages):
+    label = html.escape(_category_label(category))
+    pending = [p for p in pages if not p.get('last_reviewed')]
+    reviewed = [p for p in pages if p.get('last_reviewed')]
+
+    if pending:
+        pending_block = f'<div class="page-list">{"".join(_render_page_row(category, p) for p in pending)}</div>'
+    else:
+        pending_block = '<p class="empty-state">Nothing pending — all reviewed.</p>'
+
+    reviewed_block = ''
+    if reviewed:
+        reviewed_rows = ''.join(_render_page_row(category, p) for p in reviewed)
+        reviewed_block = f"""<details class="completed-disclosure">
+  <summary>Completed ({len(reviewed)})</summary>
+  <div class="page-list">
+    {reviewed_rows}
+  </div>
+</details>"""
+
+    return f"""<section class="category">
+  <h2 class="category-heading">{label} <span class="category-count">{len(pages)} page{'s' if len(pages) != 1 else ''}</span></h2>
+  {pending_block}
+  {reviewed_block}
+</section>"""
+
+
+def _render_index_html(site_title, categories):
+    if categories:
+        body = '\n'.join(_render_category_section(c['category'], c['pages']) for c in categories)
     else:
         body = '<p class="empty-state">No review pages yet.</p>'
 
@@ -387,24 +502,63 @@ class GallerySite:
     printed filepath list alone (which duplicate to keep, whether a batch's order
     looks right, what's actually in an import folder).
 
+    Persists across separate process invocations: review_root/{category}/manifest.json
+    tracks every page ever added to that category, so review_root/index.html is
+    rebuilt from what's actually on disk each time, not just from the current run.
+
     Not a web app: purely for viewing. Acting on what you decide (deleting a
     duplicate, running an assignment with --execute) still happens from the CLI.
     """
 
-    def __init__(self, output_dir, site_title='Pictures Review'):
-        self.output_dir = output_dir
+    def __init__(self, review_root, site_title='Pictures Review'):
+        self.review_root = review_root
         self.site_title = site_title
-        self.thumbnails_dir = os.path.join(output_dir, 'thumbnails')
-        self.pages_dir = os.path.join(output_dir, 'pages')
-        self._pages = []
+        self.thumbnails_dir = os.path.join(review_root, 'thumbnails')
 
-    def add_page(self, page_id, title, sections):
+    def _manifest_path(self, category):
+        return os.path.join(self.review_root, category, MANIFEST_FILENAME)
+
+    def _load_manifest(self, category):
+        manifest_path = self._manifest_path(category)
+        if not os.path.exists(manifest_path):
+            return []
+        with open(manifest_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+
+    def _reviews_path(self):
+        return os.path.join(self.review_root, REVIEWS_FILENAME)
+
+    def _load_reviews(self):
+        reviews_path = self._reviews_path()
+        if not os.path.exists(reviews_path):
+            return pd.DataFrame([], columns=REVIEWS_COLS)
+        return pd.read_csv(reviews_path, dtype=str, keep_default_na=False)
+
+    def _register_review_entry(self, page_path):
+        """Adds page_path to reviews.csv with an empty last_reviewed, unless it's
+        already tracked (in which case its existing review status is left alone)."""
+        serialized = helper.serialize_filepath(page_path)
+        df = self._load_reviews()
+        if serialized in set(df['filepath']):
+            return
+        new_row = pd.DataFrame([{'filepath': serialized, 'last_reviewed': ''}], columns=REVIEWS_COLS)
+        df = pd.concat([df, new_row], ignore_index=True)
+        df.to_csv(self._reviews_path(), index=False)
+
+    def mark_reviewed(self, page_path, when=None):
         """
-        sections: list of dicts, each {'heading': str, 'note': str (optional),
-        'items': list of {'filepath': str, 'label': str (optional),
-        'tag': 'keep'|'remove'|'unsure'|None (optional)}}
+        Marks the review page at page_path as reviewed and rebuilds index.html so
+        the flag shows up immediately. Raises if page_path was never added via
+        add_page() (no reviews.csv entry to update).
         """
-        self._pages.append((page_id, title, sections))
+        when = when or datetime.now()
+        serialized = helper.serialize_filepath(page_path)
+        df = self._load_reviews()
+        if serialized not in set(df['filepath']):
+            raise ValueError(f"No reviews.csv entry found for {page_path}.")
+        df.loc[df['filepath'] == serialized, 'last_reviewed'] = when.isoformat(timespec='seconds')
+        df.to_csv(self._reviews_path(), index=False)
+        self._write_index()
 
     def _resolve_thumbnail(self, filepath):
         thumb_name = _thumbnail_filename(filepath)
@@ -413,49 +567,91 @@ class GallerySite:
             _make_thumbnail(filepath, thumb_path)
         return thumb_name
 
-    def write(self):
-        os.makedirs(self.thumbnails_dir, exist_ok=True)
-        os.makedirs(self.pages_dir, exist_ok=True)
-
-        page_summaries = []
-        for page_id, title, sections in self._pages:
-            rendered_sections = []
-            for section in sections:
-                rendered_items = []
-                for item in section['items']:
-                    filepath = item['filepath']
-                    try:
-                        thumb_name = self._resolve_thumbnail(filepath)
-                    except Exception as e:
-                        print(f"!!! WARNING: Could not generate thumbnail for {filepath}: {e}")
-                        continue
-                    rendered_items.append({
-                        'thumb_src': f'../thumbnails/{thumb_name}',
-                        'original_uri': _file_uri(filepath),
-                        'filename': os.path.basename(filepath),
-                        'label': item.get('label', ''),
-                        'tag': item.get('tag'),
-                    })
-                rendered_sections.append({
-                    'heading': section['heading'],
-                    'note': section.get('note', ''),
-                    'items': rendered_items,
+    def _render_sections(self, sections):
+        rendered_sections = []
+        for section in sections:
+            rendered_items = []
+            for item in section['items']:
+                filepath = item['filepath']
+                try:
+                    thumb_name = self._resolve_thumbnail(filepath)
+                except Exception as e:
+                    print(f"!!! WARNING: Could not generate thumbnail for {filepath}: {e}")
+                    continue
+                rendered_items.append({
+                    'thumb_src': f'../thumbnails/{thumb_name}',
+                    'original_uri': _file_uri(filepath),
+                    'filename': os.path.basename(filepath),
+                    'label': item.get('label', ''),
+                    'tag': item.get('tag'),
                 })
+            rendered_sections.append({
+                'heading': section['heading'],
+                'note': section.get('note', ''),
+                'items': rendered_items,
+            })
+        return rendered_sections
 
-            item_count = sum(len(s['items']) for s in rendered_sections)
-            page_html = _render_page_html(self.site_title, title, rendered_sections)
-            with open(os.path.join(self.pages_dir, f'{page_id}.html'), 'w', encoding='utf-8') as f:
-                f.write(page_html)
+    def add_page(self, category, page_id, title, sections):
+        """
+        Writes review_root/{category}/{page_id}.html (generating thumbnails as
+        needed), updates that category's manifest, and rebuilds review_root/index.html
+        from every category's current manifest. Re-running with the same page_id
+        replaces that page's manifest entry rather than duplicating it.
 
-            page_summaries.append({'page_id': page_id, 'title': title, 'item_count': item_count})
+        Returns the path to the page that was written.
+        """
+        category_dir = os.path.join(self.review_root, category)
+        os.makedirs(category_dir, exist_ok=True)
+        os.makedirs(self.thumbnails_dir, exist_ok=True)
 
-        index_html = _render_index_html(self.site_title, page_summaries)
-        index_path = os.path.join(self.output_dir, 'index.html')
-        with open(index_path, 'w', encoding='utf-8') as f:
+        rendered_sections = self._render_sections(sections)
+        item_count = sum(len(s['items']) for s in rendered_sections)
+
+        page_html = _render_page_html(self.site_title, category, title, rendered_sections)
+        page_path = os.path.join(category_dir, f'{page_id}.html')
+        with open(page_path, 'w', encoding='utf-8') as f:
+            f.write(page_html)
+
+        self._register_review_entry(page_path)
+
+        pages = [p for p in self._load_manifest(category) if p['page_id'] != page_id]
+        pages.append({
+            'page_id': page_id,
+            'title': title,
+            'item_count': item_count,
+            'updated_at': datetime.now().isoformat(timespec='seconds'),
+        })
+        pages.sort(key=lambda p: p['updated_at'], reverse=True)
+        with open(self._manifest_path(category), 'w', encoding='utf-8') as f:
+            json.dump(pages, f, indent=2)
+
+        self._write_index()
+
+        return page_path
+
+    def _write_index(self):
+        reviews_df = self._load_reviews()
+        reviews_lookup = dict(zip(reviews_df['filepath'], reviews_df['last_reviewed']))
+
+        categories = []
+        if os.path.isdir(self.review_root):
+            for entry in sorted(os.listdir(self.review_root)):
+                category_dir = os.path.join(self.review_root, entry)
+                if not os.path.isdir(category_dir):
+                    continue
+                pages = self._load_manifest(entry)
+                if not pages:
+                    continue
+                for page in pages:
+                    page_path = os.path.join(category_dir, f"{page['page_id']}.html")
+                    page['last_reviewed'] = reviews_lookup.get(helper.serialize_filepath(page_path), '')
+                categories.append({'category': entry, 'pages': pages})
+
+        index_html = _render_index_html(self.site_title, categories)
+        with open(os.path.join(self.review_root, 'index.html'), 'w', encoding='utf-8') as f:
             f.write(index_html)
 
-        return index_path
-
     def open_in_browser(self):
-        index_path = os.path.join(self.output_dir, 'index.html')
+        index_path = os.path.join(self.review_root, 'index.html')
         webbrowser.open(_file_uri(index_path))
