@@ -7,3 +7,9 @@ pillow
 pillow_heif
 prettytable
 pytest
+insightface
+onnxruntime
+scikit-learn
+opencv-python-headless
+reverse_geocoder
+pycountry

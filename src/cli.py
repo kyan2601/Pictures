@@ -12,6 +12,7 @@ from src.classes.workflows.FaceClustering import FaceClustering
 from src.classes.workflows.GallerySite import GallerySite
 from src.classes.workflows.HighlightReel import HighlightReel
 from src.classes.workflows.LibraryStats import LibraryStats
+from src.classes.workflows.LocationEnrichment import LocationEnrichment
 from src.classes.workflows.MemoryLane import MemoryLane
 from src.classes.workflows.MetadataCleanupChecks import MetadataCleanupChecks
 from src.classes.workflows.ProcessNewMedia import ProcessNewMedia
@@ -110,6 +111,10 @@ def _faces_apply(args):
 
 def _faces_status(args):
     FaceClustering().status()
+
+
+def _location_enrich(args):
+    LocationEnrichment().enrich(years=args.years, dry_run=not args.execute)
 
 
 def main(argv=None):
@@ -266,6 +271,19 @@ def main(argv=None):
 
     faces_sub.add_parser('status', help='Show face index and cluster status.') \
         .set_defaults(func=_faces_status)
+
+    location_parser = subparsers.add_parser(
+        'location', help='Offline location enrichment from GPS coordinates.')
+    location_sub = location_parser.add_subparsers(dest='location_command', required=True)
+
+    enrich_parser = location_sub.add_parser(
+        'enrich', help='Backfill location_city/location_country from GPS (dry run by default).')
+    enrich_parser.add_argument(
+        '--years', type=int, nargs='*', help='Year(s) to enrich (defaults to all).')
+    enrich_parser.add_argument(
+        '--execute', action='store_true',
+        help='Write changes (default is a dry run).')
+    enrich_parser.set_defaults(func=_location_enrich)
 
     args = parser.parse_args(argv)
     args.func(args)
