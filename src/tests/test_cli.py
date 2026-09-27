@@ -1,4 +1,6 @@
 from src import cli, helper
+import os
+import pytest
 
 
 class _FakeWorkflow:
@@ -138,3 +140,41 @@ class TestAssignDate:
         cli.main(['assign-date', '--files', 'a.jpg', '--date', '2025-06-15', '--execute'])
 
         assert fake.instances[0].kwargs == {'dry_run': False}
+
+
+class TestMarkReviewed:
+    def _fake_gallery_site(self, instances):
+        class FakeGallerySite:
+            def __init__(self, review_root):
+                self.review_root = review_root
+                self.marked = []
+                instances.append(self)
+
+            def mark_reviewed(self, page_path):
+                self.marked.append(page_path)
+
+        return FakeGallerySite
+
+    def test_marks_page_reviewed(self, tmp_root, monkeypatch):
+        instances = []
+        monkeypatch.setattr(cli, 'GallerySite', self._fake_gallery_site(instances))
+
+        cli.main(['mark-reviewed', '--category', 'duplicate-check', '--page', '2022-05'])
+
+        assert len(instances) == 1
+        assert instances[0].review_root == str(tmp_root / 'review')
+        expected = os.path.join(str(tmp_root / 'review'), 'duplicate-check', '2022-05.html')
+        assert instances[0].marked == [expected]
+
+    def test_propagates_error_for_unknown_page(self, tmp_root, monkeypatch):
+        instances = []
+        fake_class = self._fake_gallery_site(instances)
+
+        def fail_mark_reviewed(self, page_path):
+            raise ValueError(f'No review page found at {page_path}')
+
+        fake_class.mark_reviewed = fail_mark_reviewed
+        monkeypatch.setattr(cli, 'GallerySite', fake_class)
+
+        with pytest.raises(ValueError, match='No review page found'):
+            cli.main(['mark-reviewed', '--category', 'duplicate-check', '--page', 'nope'])
