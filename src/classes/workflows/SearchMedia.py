@@ -30,7 +30,7 @@ class SearchMedia:
 
     def run(self, years=None, tags=None, people=None, title=None, comments=None,
             event_id=None, is_highlight=None, start_date=None, end_date=None, limit=None):
-        years = years if years else helper.get_years_with_metadata()
+        years = years if years else helper.get_years()
         frames = []
         for year in years:
             metadata_file = MetadataFile.get_instance(year)

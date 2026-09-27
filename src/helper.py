@@ -187,15 +187,13 @@ def get_directory_for_year_month(year, month):
     return str(os.path.join(constants.ROOT_DIR, str(year), str(month).zfill(2)))
 
 
-def get_years_with_metadata():
-    """Years that have a metadata.csv under ROOT_DIR, sorted ascending."""
-    years = []
-    pattern = os.path.join(constants.ROOT_DIR, '*', constants.METADATA_FILENAME)
-    for path in glob.glob(pattern):
-        year = os.path.basename(os.path.dirname(path))
-        if year.isdigit():
-            years.append(int(year))
-    return sorted(years)
+def get_years():
+    """Year directories under ROOT_DIR, sorted ascending.
+
+    Every year directory is guaranteed to contain a metadata.csv.
+    """
+    return sorted(int(d) for d in os.listdir(constants.ROOT_DIR)
+                  if d.isdigit() and os.path.isdir(os.path.join(constants.ROOT_DIR, d)))
 
 
 #####################################

@@ -87,7 +87,7 @@ class TestLibraryStats:
         assert 'Review pages: 1 total, 1 pending' in out
 
     def test_no_metadata(self, tmp_root, events_file, capsys, monkeypatch):
-        monkeypatch.setattr(helper, 'get_years_with_metadata', lambda: [])
+        monkeypatch.setattr(helper, 'get_years', lambda: [])
 
         per_year = LibraryStats().run()
 

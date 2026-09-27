@@ -37,7 +37,7 @@ class LibraryStats:
     coverage, hash coverage, events, and review status."""
 
     def run(self, years=None):
-        years = years if years else helper.get_years_with_metadata()
+        years = years if years else helper.get_years()
         per_year = {}
         for year in years:
             per_year[year] = self._stats_for_year(MetadataFile.get_instance(year).df)
