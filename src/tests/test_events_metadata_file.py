@@ -201,3 +201,51 @@ class TestCreateEventWithoutBackup:
         # No event was committed, and source metadata was left untouched.
         assert EventsMetadataFile.get_instance().df.empty
         assert set(MetadataFile.get_instance(2025).df['filepath']) == set(paths.values())
+
+
+class TestGetEvent:
+    def test_returns_matching_event(self, events_file):
+        emf = EventsMetadataFile.get_instance()
+        created = emf.create_event(title='Summer Trip', start_date='2025-06-15',
+                                   end_date='2025-06-20', description='Beach week')
+
+        # drop the singleton cache to prove the lookup reads from the CSV
+        EventsMetadataFile._instances = {}
+        fetched = EventsMetadataFile.get_instance().get_event(created.event_id)
+        EventsMetadataFile._instances = {}
+
+        assert fetched.event_id == created.event_id
+        assert fetched.title == 'Summer Trip'
+        assert fetched.description == 'Beach week'
+        assert fetched.get_directory() == created.get_directory()
+
+    def test_unknown_id_raises(self, events_file):
+        emf = EventsMetadataFile.get_instance()
+        emf.create_event(title='Summer Trip', start_date='2025-06-15', end_date='2025-06-15')
+
+        with pytest.raises(RuntimeError, match='No event found'):
+            emf.get_event(999)
+
+
+class TestPreviewEvent:
+    def test_preview_changes_nothing(self, tmp_root, events_file):
+        from src.tests.conftest import seed_media
+        seed_media(tmp_root, 2025, 6, [('250615001.jpg', datetime(2025, 6, 15, 10, 0))])
+        emf = EventsMetadataFile.get_instance()
+
+        event, media_df = emf.preview_event(
+            title='Summer Trip', start_date='2025-06-15', end_date='2025-06-15')
+
+        assert event.title == 'Summer Trip'
+        assert event.get_directory().endswith('06_1_June_Summer_Trip')
+        assert len(media_df) == 1
+        # no side effects: no event committed, no directories created
+        assert emf.df.empty
+        assert not (tmp_root / '2025' / '06_1_June_Summer_Trip').exists()
+
+    def test_preview_still_validates(self, events_file):
+        emf = EventsMetadataFile.get_instance()
+        emf.create_event(title='First', start_date='2025-06-15', end_date='2025-06-15')
+
+        with pytest.raises(RuntimeError, match='overlaps with existing event'):
+            emf.preview_event(title='Second', start_date='2025-06-15', end_date='2025-06-16')

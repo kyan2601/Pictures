@@ -1,10 +1,21 @@
 import os
 import pandas as pd
 import shutil
+from PIL import Image
+
+import imagehash
 
 from src import constants, helper
 from src.classes import media_class_factory
 from src.classes.entities.MetadataFile import MetadataFile
+
+
+_PICTURE_EXTENSIONS = {e.value for e in constants.PictureExtension}
+
+
+def _is_picture(filepath):
+    ext = str(filepath).rsplit('.', 1)[-1].lower() if '.' in str(filepath) else ''
+    return ext in _PICTURE_EXTENSIONS
 
 
 class MetadataCleanupChecks:
@@ -122,9 +133,63 @@ class MetadataCleanupChecks:
             completion = sum(metadata[col].notnull()) / len_metadata
             print(f"Column: {col} - {completion:.1%}")
 
-        # TODO: pixel hashes should be mandatory for pictures
-
         return check_flag
+
+    def _check_for_missing_pixel_hashes(self, dry_run=False) -> bool:
+        print(f"[*] Checking pixel hash coverage for pictures [{self.year}]")
+        df = self.metadata_file.df
+        missing = df[df['filepath'].apply(_is_picture)
+                     & (df['phash'].isnull() | df['dhash'].isnull())]
+        if missing.empty:
+            print("[-] All pictures have pixel hashes!")
+            return True
+
+        print(f"[!!!] WARNING: {len(missing)} picture(s) missing pixel hashes.")
+        if dry_run:
+            print("[dry run] Would compute and backfill missing hashes.")
+            return False
+
+        backfilled = 0
+        for _, row in missing.iterrows():
+            try:
+                with Image.open(row['filepath']) as img:
+                    phash, dhash = str(imagehash.phash(img)), str(imagehash.dhash(img))
+            except Exception as e:
+                print(f"[!!!] Could not hash {row['filepath']}: {e}")
+                continue
+            self.metadata_file.df.loc[
+                self.metadata_file.df['filepath'] == row['filepath'], ['phash', 'dhash']] = [phash, dhash]
+            backfilled += 1
+        self.metadata_file.write()
+        print(f"[-] Backfilled hashes for {backfilled}/{len(missing)} picture(s).")
+        return backfilled == len(missing)
+
+    def _check_for_unreadable_files(self) -> bool:
+        print(f"[*] Checking that indexed files are readable [{self.year}]")
+        unreadable = []
+        for filepath in self.metadata_file.df['filepath']:
+            if not os.path.exists(filepath):
+                continue  # covered by _check_for_deleted_media
+            try:
+                if _is_picture(filepath):
+                    with Image.open(filepath) as img:
+                        img.verify()
+                elif os.path.getsize(filepath) == 0:
+                    # videos only get a lightweight non-empty check here
+                    raise ValueError("file is empty")
+            except Exception as e:
+                unreadable.append((filepath, str(e)))
+
+        if unreadable:
+            print(f"[!!!] WARNING: {len(unreadable)} unreadable file(s):")
+            for filepath, error in unreadable[:10]:
+                print(f"  {filepath}: {error}")
+            if len(unreadable) > 10:
+                print(f"  ... and {len(unreadable) - 10} more")
+            return False
+
+        print("[-] All indexed files are readable!")
+        return True
 
     def _identify_overlapping_filenames(self) -> bool:
         print(f"[*] Initiating overlapping filename search [{self.metadata_file.year}]")
@@ -283,6 +348,8 @@ class MetadataCleanupChecks:
         check_flag &= self._check_for_unindexed_media(dry_run=dry_run)
         check_flag &= self._check_for_deleted_media(dry_run=dry_run)
         check_flag &= self._check_for_unexpected_NAs()
+        check_flag &= self._check_for_missing_pixel_hashes(dry_run=dry_run)
+        check_flag &= self._check_for_unreadable_files()
         check_flag &= self._identify_overlapping_filenames()
         check_flag &= self._check_for_mismatching_filename_and_datetime()
         check_flag &= self._reorder_media_by_datetime(dry_run=dry_run)

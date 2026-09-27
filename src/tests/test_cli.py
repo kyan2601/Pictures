@@ -178,3 +178,218 @@ class TestMarkReviewed:
 
         with pytest.raises(ValueError, match='No review page found'):
             cli.main(['mark-reviewed', '--category', 'duplicate-check', '--page', 'nope'])
+
+
+class TestAnnotate:
+    def test_defaults_to_dry_run_and_passes_fields(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AnnotateMedia', fake)
+
+        cli.main(['annotate', '--files', 'a.jpg', 'b.jpg', '--title', 'Trip',
+                  '--tags', 'beach,sun', '--people', 'alice', '--comments', 'nice',
+                  '--highlight'])
+
+        assert fake.instances[0].kwargs == {'dry_run': True}
+        assert fake.instances[0].run_calls == [
+            ((['a.jpg', 'b.jpg'],),
+             {'title': 'Trip', 'tags': 'beach,sun', 'people': 'alice',
+              'comments': 'nice', 'is_highlight': True})]
+
+    def test_no_highlight_flag(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AnnotateMedia', fake)
+
+        cli.main(['annotate', '--files', 'a.jpg', '--no-highlight'])
+
+        assert fake.instances[0].run_calls[0][1]['is_highlight'] is False
+
+    def test_highlight_defaults_to_none(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AnnotateMedia', fake)
+
+        cli.main(['annotate', '--files', 'a.jpg', '--title', 'Trip'])
+
+        assert fake.instances[0].run_calls[0][1]['is_highlight'] is None
+
+    def test_execute_flag_disables_dry_run(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AnnotateMedia', fake)
+
+        cli.main(['annotate', '--files', 'a.jpg', '--title', 'Trip', '--execute'])
+
+        assert fake.instances[0].kwargs == {'dry_run': False}
+
+
+class _FakeEvent:
+    event_id = 7
+    title = 'Trip'
+
+    def get_directory(self):
+        return '/fake/event/dir'
+
+
+class _FakeEventsFile:
+    instances = []
+
+    def __init__(self):
+        self.preview_calls = []
+        self.create_calls = []
+        _FakeEventsFile.instances.append(self)
+
+    @classmethod
+    def get_instance(cls):
+        return cls()
+
+    def preview_event(self, **kwargs):
+        self.preview_calls.append(kwargs)
+        return (_FakeEvent(), 'media_df')
+
+    def create_event(self, **kwargs):
+        self.create_calls.append(kwargs)
+        return _FakeEvent()
+
+
+class TestCreateEvent:
+    def test_dry_run_previews_without_creating(self, monkeypatch):
+        _FakeEventsFile.instances = []
+        monkeypatch.setattr(cli, 'EventsMetadataFile', _FakeEventsFile)
+
+        cli.main(['create-event', '--title', 'Trip', '--start-date', '2025-06-01',
+                  '--end-date', '2025-06-07', '--description', 'Fun',
+                  '--nominal-month', 'June'])
+
+        assert len(_FakeEventsFile.instances) == 1
+        fake = _FakeEventsFile.instances[0]
+        assert fake.preview_calls == [{'title': 'Trip', 'start_date': '2025-06-01',
+                                       'end_date': '2025-06-07', 'nominal_month': 'June'}]
+        assert fake.create_calls == []
+
+    def test_execute_calls_create_event_with_backup_by_default(self, monkeypatch):
+        _FakeEventsFile.instances = []
+        monkeypatch.setattr(cli, 'EventsMetadataFile', _FakeEventsFile)
+
+        cli.main(['create-event', '--title', 'Trip', '--start-date', '2025-06-01',
+                  '--end-date', '2025-06-07', '--execute'])
+
+        fake = _FakeEventsFile.instances[0]
+        assert fake.preview_calls == []
+        assert fake.create_calls == [{'title': 'Trip', 'start_date': '2025-06-01',
+                                      'end_date': '2025-06-07', 'description': None,
+                                      'nominal_month': None, 'backup': True}]
+
+    def test_no_backup_flag(self, monkeypatch):
+        _FakeEventsFile.instances = []
+        monkeypatch.setattr(cli, 'EventsMetadataFile', _FakeEventsFile)
+
+        cli.main(['create-event', '--title', 'Trip', '--start-date', '2025-06-01',
+                  '--end-date', '2025-06-07', '--execute', '--no-backup'])
+
+        assert _FakeEventsFile.instances[0].create_calls[0]['backup'] is False
+
+
+class TestAssignEvent:
+    def test_defaults_to_dry_run(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AssignEvent', fake)
+
+        cli.main(['assign-event', '--files', 'a.jpg', 'b.jpg', '--event-id', '3'])
+
+        assert fake.instances[0].kwargs == {'dry_run': True}
+        assert fake.instances[0].run_calls == [((['a.jpg', 'b.jpg'], 3), {})]
+
+    def test_execute_flag_disables_dry_run(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AssignEvent', fake)
+
+        cli.main(['assign-event', '--files', 'a.jpg', '--event-id', '3', '--execute'])
+
+        assert fake.instances[0].kwargs == {'dry_run': False}
+
+
+class TestSearch:
+    def test_passes_all_filters_through(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'SearchMedia', fake)
+
+        cli.main(['search', '--year', '2024', '2025', '--tags', 'beach,sun',
+                  '--people', 'alice', '--title', 'trip', '--comments', 'nice',
+                  '--event-id', '3', '--highlight',
+                  '--start-date', '2025-06-01', '--end-date', '2025-06-30',
+                  '--limit', '10'])
+
+        assert fake.instances[0].run_calls == [((), {
+            'years': [2024, 2025], 'tags': 'beach,sun', 'people': 'alice',
+            'title': 'trip', 'comments': 'nice', 'event_id': 3,
+            'is_highlight': True, 'start_date': '2025-06-01',
+            'end_date': '2025-06-30', 'limit': 10})]
+
+    def test_defaults(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'SearchMedia', fake)
+
+        cli.main(['search'])
+
+        assert fake.instances[0].run_calls == [((), {
+            'years': None, 'tags': None, 'people': None, 'title': None,
+            'comments': None, 'event_id': None, 'is_highlight': False,
+            'start_date': None, 'end_date': None, 'limit': None})]
+
+
+class TestStats:
+    def test_passes_years_through(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'LibraryStats', fake)
+
+        cli.main(['stats', '--year', '2024', '2025'])
+
+        assert fake.instances[0].args == ()
+        assert fake.instances[0].kwargs == {}
+        assert fake.instances[0].run_calls == [((), {'years': [2024, 2025]})]
+
+    def test_year_defaults_to_none(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'LibraryStats', fake)
+
+        cli.main(['stats'])
+
+        assert fake.instances[0].run_calls == [((), {'years': None})]
+
+
+class TestMemoryLane:
+    def test_passes_args_through(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'MemoryLane', fake)
+
+        cli.main(['memory-lane', '--month', '6', '--day', '15', '--limit', '5'])
+
+        assert fake.instances[0].run_calls == [
+            ((), {'month': 6, 'day': 15, 'limit_per_year': 5})]
+
+    def test_defaults(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'MemoryLane', fake)
+
+        cli.main(['memory-lane'])
+
+        assert fake.instances[0].run_calls == [
+            ((), {'month': None, 'day': None, 'limit_per_year': 12})]
+
+
+class TestHighlightReel:
+    def test_passes_args_through(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'HighlightReel', fake)
+
+        cli.main(['highlight-reel', '--year', '2024', '--limit', '50'])
+
+        assert fake.instances[0].run_calls == [
+            ((), {'year': 2024, 'limit': 50})]
+
+    def test_defaults(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'HighlightReel', fake)
+
+        cli.main(['highlight-reel'])
+
+        assert fake.instances[0].run_calls == [
+            ((), {'year': None, 'limit': 100})]

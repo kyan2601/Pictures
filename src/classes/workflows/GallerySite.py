@@ -534,6 +534,13 @@ class GallerySite:
             return pd.DataFrame([], columns=REVIEWS_COLS)
         return pd.read_csv(reviews_path, dtype=str, keep_default_na=False)
 
+    def get_review_stats(self):
+        """Returns (total_pages, pending_pages) from reviews.csv."""
+        df = self._load_reviews()
+        total = len(df)
+        pending = int((df['last_reviewed'] == '').sum()) if total else 0
+        return total, pending
+
     def _register_review_entry(self, page_path):
         """Adds page_path to reviews.csv with an empty last_reviewed, unless it's
         already tracked (in which case its existing review status is left alone)."""
