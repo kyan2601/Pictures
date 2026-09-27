@@ -16,7 +16,7 @@ class MemoryLane:
     def _collect_sections(self, month, day, limit_per_year):
         sections = []
         current_year = datetime.now().year
-        for year in helper.get_years_with_metadata():
+        for year in helper.get_years():
             if year >= current_year:
                 continue
             df = MetadataFile.get_instance(year).df
