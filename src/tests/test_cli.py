@@ -333,3 +333,23 @@ class TestSearch:
             'years': None, 'tags': None, 'people': None, 'title': None,
             'comments': None, 'event_id': None, 'is_highlight': False,
             'start_date': None, 'end_date': None, 'limit': None})]
+
+
+class TestStats:
+    def test_passes_years_through(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'LibraryStats', fake)
+
+        cli.main(['stats', '--year', '2024', '2025'])
+
+        assert fake.instances[0].args == ()
+        assert fake.instances[0].kwargs == {}
+        assert fake.instances[0].run_calls == [((), {'years': [2024, 2025]})]
+
+    def test_year_defaults_to_none(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'LibraryStats', fake)
+
+        cli.main(['stats'])
+
+        assert fake.instances[0].run_calls == [((), {'years': None})]

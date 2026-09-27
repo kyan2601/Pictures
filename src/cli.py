@@ -9,6 +9,7 @@ from src.classes.workflows.AssignDate import AssignDate
 from src.classes.workflows.AssignEvent import AssignEvent
 from src.classes.workflows.DuplicateImageCheck import DuplicateImageCheck
 from src.classes.workflows.GallerySite import GallerySite
+from src.classes.workflows.LibraryStats import LibraryStats
 from src.classes.workflows.MetadataCleanupChecks import MetadataCleanupChecks
 from src.classes.workflows.ProcessNewMedia import ProcessNewMedia
 from src.classes.workflows.SearchMedia import SearchMedia
@@ -76,6 +77,10 @@ def _search(args):
         years=args.year, tags=args.tags, people=args.people, title=args.title,
         comments=args.comments, event_id=args.event_id, is_highlight=args.highlight,
         start_date=args.start_date, end_date=args.end_date, limit=args.limit)
+
+
+def _stats(args):
+    LibraryStats().run(years=args.year)
 
 
 def main(argv=None):
@@ -176,6 +181,12 @@ def main(argv=None):
     search_parser.add_argument('--end-date', help='Only media on/before this date (YYYY-MM-DD).')
     search_parser.add_argument('--limit', type=int, help='Max results to show.')
     search_parser.set_defaults(func=_search)
+
+    stats_parser = subparsers.add_parser(
+        'stats', help='Print library statistics (read-only).')
+    stats_parser.add_argument(
+        '--year', type=int, nargs='*', help='Year(s) to include (defaults to all years).')
+    stats_parser.set_defaults(func=_stats)
 
     args = parser.parse_args(argv)
     args.func(args)

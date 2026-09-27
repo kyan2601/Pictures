@@ -1,11 +1,9 @@
-import glob
-import os
 from datetime import datetime, timedelta
 
 import pandas as pd
 from prettytable import PrettyTable
 
-from src import constants
+from src import helper
 from src.classes.entities.MetadataFile import MetadataFile
 
 
@@ -20,16 +18,6 @@ class SearchMedia:
     COLUMNS = ['filepath', 'dt', 'title', 'tags', 'people', 'event_id', 'is_highlight']
 
     @staticmethod
-    def _available_years():
-        years = []
-        pattern = os.path.join(constants.ROOT_DIR, '*', constants.METADATA_FILENAME)
-        for path in glob.glob(pattern):
-            year = os.path.basename(os.path.dirname(path))
-            if year.isdigit():
-                years.append(int(year))
-        return sorted(years)
-
-    @staticmethod
     def _matches_any(stored_value, wanted):
         if stored_value is None or (isinstance(stored_value, float) and pd.isna(stored_value)):
             return False
@@ -42,7 +30,7 @@ class SearchMedia:
 
     def run(self, years=None, tags=None, people=None, title=None, comments=None,
             event_id=None, is_highlight=None, start_date=None, end_date=None, limit=None):
-        years = years if years else self._available_years()
+        years = years if years else helper.get_years_with_metadata()
         frames = []
         for year in years:
             metadata_file = MetadataFile.get_instance(year)
