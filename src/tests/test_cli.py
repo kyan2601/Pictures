@@ -304,3 +304,32 @@ class TestAssignEvent:
         cli.main(['assign-event', '--files', 'a.jpg', '--event-id', '3', '--execute'])
 
         assert fake.instances[0].kwargs == {'dry_run': False}
+
+
+class TestSearch:
+    def test_passes_all_filters_through(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'SearchMedia', fake)
+
+        cli.main(['search', '--year', '2024', '2025', '--tags', 'beach,sun',
+                  '--people', 'alice', '--title', 'trip', '--comments', 'nice',
+                  '--event-id', '3', '--highlight',
+                  '--start-date', '2025-06-01', '--end-date', '2025-06-30',
+                  '--limit', '10'])
+
+        assert fake.instances[0].run_calls == [((), {
+            'years': [2024, 2025], 'tags': 'beach,sun', 'people': 'alice',
+            'title': 'trip', 'comments': 'nice', 'event_id': 3,
+            'is_highlight': True, 'start_date': '2025-06-01',
+            'end_date': '2025-06-30', 'limit': 10})]
+
+    def test_defaults(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'SearchMedia', fake)
+
+        cli.main(['search'])
+
+        assert fake.instances[0].run_calls == [((), {
+            'years': None, 'tags': None, 'people': None, 'title': None,
+            'comments': None, 'event_id': None, 'is_highlight': False,
+            'start_date': None, 'end_date': None, 'limit': None})]

@@ -11,6 +11,7 @@ from src.classes.workflows.DuplicateImageCheck import DuplicateImageCheck
 from src.classes.workflows.GallerySite import GallerySite
 from src.classes.workflows.MetadataCleanupChecks import MetadataCleanupChecks
 from src.classes.workflows.ProcessNewMedia import ProcessNewMedia
+from src.classes.workflows.SearchMedia import SearchMedia
 
 
 def _process_new(args):
@@ -68,6 +69,13 @@ def _create_event(args):
 
 def _assign_event(args):
     AssignEvent(dry_run=not args.execute).run(args.files, args.event_id)
+
+
+def _search(args):
+    SearchMedia().run(
+        years=args.year, tags=args.tags, people=args.people, title=args.title,
+        comments=args.comments, event_id=args.event_id, is_highlight=args.highlight,
+        start_date=args.start_date, end_date=args.end_date, limit=args.limit)
 
 
 def main(argv=None):
@@ -153,6 +161,21 @@ def main(argv=None):
     assign_event_parser.add_argument('--event-id', type=int, required=True, help='Target event id.')
     assign_event_parser.add_argument('--execute', action='store_true', help='Apply changes (default is dry run).')
     assign_event_parser.set_defaults(func=_assign_event)
+
+    search_parser = subparsers.add_parser(
+        'search', help='Search metadata across years (read-only).')
+    search_parser.add_argument(
+        '--year', type=int, nargs='*', help='Year(s) to search (defaults to all years).')
+    search_parser.add_argument('--tags', help='Tags to match (comma- or semicolon-separated, any match).')
+    search_parser.add_argument('--people', help='People to match (comma- or semicolon-separated, any match).')
+    search_parser.add_argument('--title', help='Case-insensitive substring match on title.')
+    search_parser.add_argument('--comments', help='Case-insensitive substring match on comments.')
+    search_parser.add_argument('--event-id', type=int, help='Only media in this event.')
+    search_parser.add_argument('--highlight', action='store_true', help='Only highlights.')
+    search_parser.add_argument('--start-date', help='Only media on/after this date (YYYY-MM-DD).')
+    search_parser.add_argument('--end-date', help='Only media on/before this date (YYYY-MM-DD).')
+    search_parser.add_argument('--limit', type=int, help='Max results to show.')
+    search_parser.set_defaults(func=_search)
 
     args = parser.parse_args(argv)
     args.func(args)
