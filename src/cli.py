@@ -3,8 +3,10 @@ import os
 
 from src import constants, helper
 from src.adhoc.cleanup_backups import main as cleanup_backups_main
+from src.classes.entities.EventsMetadataFile import EventsMetadataFile
 from src.classes.workflows.AnnotateMedia import AnnotateMedia
 from src.classes.workflows.AssignDate import AssignDate
+from src.classes.workflows.AssignEvent import AssignEvent
 from src.classes.workflows.DuplicateImageCheck import DuplicateImageCheck
 from src.classes.workflows.GallerySite import GallerySite
 from src.classes.workflows.MetadataCleanupChecks import MetadataCleanupChecks
@@ -44,6 +46,28 @@ def _annotate(args):
     AnnotateMedia(dry_run=not args.execute).run(
         args.files, title=args.title, tags=args.tags, people=args.people,
         comments=args.comments, is_highlight=args.is_highlight)
+
+
+def _create_event(args):
+    events_file = EventsMetadataFile.get_instance()
+    if not args.execute:
+        event, media_df = events_file.preview_event(
+            title=args.title, start_date=args.start_date, end_date=args.end_date,
+            nominal_month=args.nominal_month)
+        print(f'[dry run] would create event {event.event_id} [{event.title}]')
+        print(f'[dry run] event directory: {event.get_directory()}')
+        print(f'[dry run] {len(media_df)} media file(s) in range would move '
+              f'into the event directory')
+        return
+    event = events_file.create_event(
+        title=args.title, start_date=args.start_date, end_date=args.end_date,
+        description=args.description, nominal_month=args.nominal_month,
+        backup=not args.no_backup)
+    print(event)
+
+
+def _assign_event(args):
+    AssignEvent(dry_run=not args.execute).run(args.files, args.event_id)
 
 
 def main(argv=None):
@@ -108,6 +132,27 @@ def main(argv=None):
         help='Unmark highlight.')
     annotate_parser.add_argument('--execute', action='store_true', help='Apply changes (default is dry run).')
     annotate_parser.set_defaults(func=_annotate)
+
+    create_event_parser = subparsers.add_parser(
+        'create-event', help='Create an event and move in-range media into its folder.')
+    create_event_parser.add_argument('--title', required=True, help='Event title.')
+    create_event_parser.add_argument('--start-date', required=True, help='Start date (YYYY-MM-DD).')
+    create_event_parser.add_argument('--end-date', required=True, help='End date (YYYY-MM-DD).')
+    create_event_parser.add_argument('--description', help='Event description.')
+    create_event_parser.add_argument('--nominal-month', help='Month name for the folder (defaults to the start month).')
+    create_event_parser.add_argument(
+        '--no-backup', action='store_true',
+        help='Skip the backup step (originals are deleted instead of moved to backup).')
+    create_event_parser.add_argument('--execute', action='store_true', help='Apply changes (default is dry run).')
+    create_event_parser.set_defaults(func=_create_event)
+
+    assign_event_parser = subparsers.add_parser(
+        'assign-event', help="Move files into an existing event's folder and set their event_id.")
+    assign_event_parser.add_argument(
+        '--files', nargs='+', required=True, help='Filepaths to assign (as listed in metadata.csv).')
+    assign_event_parser.add_argument('--event-id', type=int, required=True, help='Target event id.')
+    assign_event_parser.add_argument('--execute', action='store_true', help='Apply changes (default is dry run).')
+    assign_event_parser.set_defaults(func=_assign_event)
 
     args = parser.parse_args(argv)
     args.func(args)

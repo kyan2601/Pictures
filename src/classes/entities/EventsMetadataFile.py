@@ -84,8 +84,23 @@ class EventsMetadataFile:
             event_id = self.df['event_id'].max() + 1
         return int(event_id)
 
-    def create_event(self, title, start_date, end_date,
-                     description=None, nominal_month=None, backup=True) -> EventEntry:
+    def get_event(self, event_id) -> EventEntry:
+        matches = self.df[self.df['event_id'] == int(event_id)]
+        if matches.empty:
+            raise RuntimeError(f"No event found with event_id [{event_id}].")
+        row = matches.iloc[0]
+        return EventEntry(
+            int(row['event_id']), int(row['event_index']),
+            row['start_date'], row['end_date'], row['title'],
+            description=None if pd.isna(row['description']) else row['description'],
+            nominal_month=None if pd.isna(row['nominal_month']) else row['nominal_month'],
+        )
+
+    def _plan_event(self, title, start_date, end_date,
+                    description=None, nominal_month=None):
+        """Validates the date range and computes the event entry plus the media
+        that would be associated with it. Read-only: no filesystem or CSV changes.
+        Returns (EventEntry, DataFrame of media in range)."""
         print(f'[*] Staging new event: {title}')
         start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
         end_date_dt = datetime.strptime(end_date, '%Y-%m-%d')
@@ -110,7 +125,7 @@ class EventsMetadataFile:
             mf.df[(mf.df['dt'].dt.date >= start_date_dt.date()) & (mf.df['dt'].dt.date <= end_date_dt.date())]
             for mf in metadata_files
         ]
-        
+
         all_media_df = pd.concat(media_in_range_dfs) if media_in_range_dfs else pd.DataFrame()
 
         if not all_media_df.empty and all_media_df['event_id'].notna().any():
@@ -124,6 +139,17 @@ class EventsMetadataFile:
         event_index = _calculate_next_event_index(start_date_dt.strftime('%Y'), start_date_dt.strftime('%m'))
         event = EventEntry(event_id, event_index, start_date_dt, end_date_dt, title, description, nominal_month)
         print(f"[-] Event plan created with ID: {event.event_id}")
+        return event, all_media_df
+
+    def preview_event(self, title, start_date, end_date, nominal_month=None):
+        """Dry-run planning for create_event: validates and reports what would
+        happen without touching the filesystem or any CSV."""
+        return self._plan_event(title, start_date, end_date, nominal_month=nominal_month)
+
+    def create_event(self, title, start_date, end_date,
+                     description=None, nominal_month=None, backup=True) -> EventEntry:
+        event, all_media_df = self._plan_event(
+            title, start_date, end_date, description=description, nominal_month=nominal_month)
 
         if all_media_df.empty:
             print("[!] No media found in date range. Creating event entry only.")

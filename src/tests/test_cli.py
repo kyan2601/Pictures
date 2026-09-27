@@ -218,3 +218,89 @@ class TestAnnotate:
         cli.main(['annotate', '--files', 'a.jpg', '--title', 'Trip', '--execute'])
 
         assert fake.instances[0].kwargs == {'dry_run': False}
+
+
+class _FakeEvent:
+    event_id = 7
+    title = 'Trip'
+
+    def get_directory(self):
+        return '/fake/event/dir'
+
+
+class _FakeEventsFile:
+    instances = []
+
+    def __init__(self):
+        self.preview_calls = []
+        self.create_calls = []
+        _FakeEventsFile.instances.append(self)
+
+    @classmethod
+    def get_instance(cls):
+        return cls()
+
+    def preview_event(self, **kwargs):
+        self.preview_calls.append(kwargs)
+        return (_FakeEvent(), 'media_df')
+
+    def create_event(self, **kwargs):
+        self.create_calls.append(kwargs)
+        return _FakeEvent()
+
+
+class TestCreateEvent:
+    def test_dry_run_previews_without_creating(self, monkeypatch):
+        _FakeEventsFile.instances = []
+        monkeypatch.setattr(cli, 'EventsMetadataFile', _FakeEventsFile)
+
+        cli.main(['create-event', '--title', 'Trip', '--start-date', '2025-06-01',
+                  '--end-date', '2025-06-07', '--description', 'Fun',
+                  '--nominal-month', 'June'])
+
+        assert len(_FakeEventsFile.instances) == 1
+        fake = _FakeEventsFile.instances[0]
+        assert fake.preview_calls == [{'title': 'Trip', 'start_date': '2025-06-01',
+                                       'end_date': '2025-06-07', 'nominal_month': 'June'}]
+        assert fake.create_calls == []
+
+    def test_execute_calls_create_event_with_backup_by_default(self, monkeypatch):
+        _FakeEventsFile.instances = []
+        monkeypatch.setattr(cli, 'EventsMetadataFile', _FakeEventsFile)
+
+        cli.main(['create-event', '--title', 'Trip', '--start-date', '2025-06-01',
+                  '--end-date', '2025-06-07', '--execute'])
+
+        fake = _FakeEventsFile.instances[0]
+        assert fake.preview_calls == []
+        assert fake.create_calls == [{'title': 'Trip', 'start_date': '2025-06-01',
+                                      'end_date': '2025-06-07', 'description': None,
+                                      'nominal_month': None, 'backup': True}]
+
+    def test_no_backup_flag(self, monkeypatch):
+        _FakeEventsFile.instances = []
+        monkeypatch.setattr(cli, 'EventsMetadataFile', _FakeEventsFile)
+
+        cli.main(['create-event', '--title', 'Trip', '--start-date', '2025-06-01',
+                  '--end-date', '2025-06-07', '--execute', '--no-backup'])
+
+        assert _FakeEventsFile.instances[0].create_calls[0]['backup'] is False
+
+
+class TestAssignEvent:
+    def test_defaults_to_dry_run(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AssignEvent', fake)
+
+        cli.main(['assign-event', '--files', 'a.jpg', 'b.jpg', '--event-id', '3'])
+
+        assert fake.instances[0].kwargs == {'dry_run': True}
+        assert fake.instances[0].run_calls == [((['a.jpg', 'b.jpg'], 3), {})]
+
+    def test_execute_flag_disables_dry_run(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AssignEvent', fake)
+
+        cli.main(['assign-event', '--files', 'a.jpg', '--event-id', '3', '--execute'])
+
+        assert fake.instances[0].kwargs == {'dry_run': False}
