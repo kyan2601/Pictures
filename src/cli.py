@@ -1,9 +1,11 @@
 import argparse
+import os
 
-from src import helper
+from src import constants, helper
 from src.adhoc.cleanup_backups import main as cleanup_backups_main
 from src.classes.workflows.AssignDate import AssignDate
 from src.classes.workflows.DuplicateImageCheck import DuplicateImageCheck
+from src.classes.workflows.GallerySite import GallerySite
 from src.classes.workflows.MetadataCleanupChecks import MetadataCleanupChecks
 from src.classes.workflows.ProcessNewMedia import ProcessNewMedia
 
@@ -29,6 +31,12 @@ def _cleanup_backups(args):
 
 def _assign_date(args):
     AssignDate(dry_run=not args.execute).run(args.files, args.date)
+
+
+def _mark_reviewed(args):
+    page_path = os.path.join(constants.REVIEW_DIR, args.category, f'{args.page}.html')
+    GallerySite(constants.REVIEW_DIR).mark_reviewed(page_path)
+    print(f'Marked as reviewed: {page_path}')
 
 
 def main(argv=None):
@@ -68,6 +76,13 @@ def main(argv=None):
     assign_date_parser.add_argument('--date', required=True, help='Target date (YYYY-MM-DD).')
     assign_date_parser.add_argument('--execute', action='store_true', help='Apply changes (default is dry run).')
     assign_date_parser.set_defaults(func=_assign_date)
+
+    mark_reviewed_parser = subparsers.add_parser(
+        'mark-reviewed', help='Mark a review page as reviewed.')
+    mark_reviewed_parser.add_argument(
+        '--category', required=True, help="Review category (e.g. 'duplicate-check').")
+    mark_reviewed_parser.add_argument('--page', required=True, help="Page id (e.g. '2022-05').")
+    mark_reviewed_parser.set_defaults(func=_mark_reviewed)
 
     args = parser.parse_args(argv)
     args.func(args)
