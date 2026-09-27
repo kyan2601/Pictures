@@ -10,6 +10,7 @@ from src.classes.workflows.AssignEvent import AssignEvent
 from src.classes.workflows.DuplicateImageCheck import DuplicateImageCheck
 from src.classes.workflows.GallerySite import GallerySite
 from src.classes.workflows.LibraryStats import LibraryStats
+from src.classes.workflows.MemoryLane import MemoryLane
 from src.classes.workflows.MetadataCleanupChecks import MetadataCleanupChecks
 from src.classes.workflows.ProcessNewMedia import ProcessNewMedia
 from src.classes.workflows.SearchMedia import SearchMedia
@@ -81,6 +82,10 @@ def _search(args):
 
 def _stats(args):
     LibraryStats().run(years=args.year)
+
+
+def _memory_lane(args):
+    MemoryLane().run(month=args.month, day=args.day, limit_per_year=args.limit)
 
 
 def main(argv=None):
@@ -187,6 +192,14 @@ def main(argv=None):
     stats_parser.add_argument(
         '--year', type=int, nargs='*', help='Year(s) to include (defaults to all years).')
     stats_parser.set_defaults(func=_stats)
+
+    memory_lane_parser = subparsers.add_parser(
+        'memory-lane', help="Build an 'on this day' gallery page from previous years.")
+    memory_lane_parser.add_argument('--month', type=int, help='Month (defaults to today).')
+    memory_lane_parser.add_argument('--day', type=int, help='Day of month (defaults to today).')
+    memory_lane_parser.add_argument(
+        '--limit', type=int, default=12, help='Max photos per year (default: 12).')
+    memory_lane_parser.set_defaults(func=_memory_lane)
 
     args = parser.parse_args(argv)
     args.func(args)

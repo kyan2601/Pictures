@@ -353,3 +353,23 @@ class TestStats:
         cli.main(['stats'])
 
         assert fake.instances[0].run_calls == [((), {'years': None})]
+
+
+class TestMemoryLane:
+    def test_passes_args_through(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'MemoryLane', fake)
+
+        cli.main(['memory-lane', '--month', '6', '--day', '15', '--limit', '5'])
+
+        assert fake.instances[0].run_calls == [
+            ((), {'month': 6, 'day': 15, 'limit_per_year': 5})]
+
+    def test_defaults(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'MemoryLane', fake)
+
+        cli.main(['memory-lane'])
+
+        assert fake.instances[0].run_calls == [
+            ((), {'month': None, 'day': None, 'limit_per_year': 12})]
