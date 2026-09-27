@@ -373,3 +373,23 @@ class TestMemoryLane:
 
         assert fake.instances[0].run_calls == [
             ((), {'month': None, 'day': None, 'limit_per_year': 12})]
+
+
+class TestHighlightReel:
+    def test_passes_args_through(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'HighlightReel', fake)
+
+        cli.main(['highlight-reel', '--year', '2024', '--limit', '50'])
+
+        assert fake.instances[0].run_calls == [
+            ((), {'year': 2024, 'limit': 50})]
+
+    def test_defaults(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'HighlightReel', fake)
+
+        cli.main(['highlight-reel'])
+
+        assert fake.instances[0].run_calls == [
+            ((), {'year': None, 'limit': 100})]
