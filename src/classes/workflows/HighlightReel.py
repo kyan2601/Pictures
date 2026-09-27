@@ -12,7 +12,7 @@ class HighlightReel:
     CATEGORY = 'highlight-reel'
 
     def _latest_year_with_highlights(self):
-        for year in sorted(helper.get_years_with_metadata(), reverse=True):
+        for year in sorted(helper.get_years(), reverse=True):
             df = MetadataFile.get_instance(year).df
             if df is not None and not df.empty and (df['is_highlight'] == 1).any():
                 return year
