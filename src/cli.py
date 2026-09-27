@@ -8,6 +8,7 @@ from src.classes.workflows.AnnotateMedia import AnnotateMedia
 from src.classes.workflows.AssignDate import AssignDate
 from src.classes.workflows.AssignEvent import AssignEvent
 from src.classes.workflows.DuplicateImageCheck import DuplicateImageCheck
+from src.classes.workflows.FaceClustering import FaceClustering
 from src.classes.workflows.GallerySite import GallerySite
 from src.classes.workflows.HighlightReel import HighlightReel
 from src.classes.workflows.LibraryStats import LibraryStats
@@ -91,6 +92,24 @@ def _memory_lane(args):
 
 def _highlight_reel(args):
     HighlightReel().run(year=args.year, limit=args.limit)
+
+
+def _faces_scan(args):
+    FaceClustering().scan(years=args.years, eps=args.eps,
+                          min_samples=args.min_samples,
+                          build_review=not args.no_review)
+
+
+def _faces_name(args):
+    FaceClustering().name_cluster(args.cluster, args.name)
+
+
+def _faces_apply(args):
+    FaceClustering().apply_names(dry_run=not args.execute)
+
+
+def _faces_status(args):
+    FaceClustering().status()
 
 
 def main(argv=None):
@@ -213,6 +232,40 @@ def main(argv=None):
     highlight_reel_parser.add_argument(
         '--limit', type=int, default=100, help='Max photos in the reel (default: 100).')
     highlight_reel_parser.set_defaults(func=_highlight_reel)
+
+    faces_parser = subparsers.add_parser(
+        'faces', help='Face detection, clustering and naming.')
+    faces_sub = faces_parser.add_subparsers(dest='faces_command', required=True)
+
+    scan_parser = faces_sub.add_parser(
+        'scan', help='Detect faces (incrementally) and cluster them.')
+    scan_parser.add_argument(
+        '--years', type=int, nargs='*', help='Year(s) to scan for new faces (defaults to all).')
+    scan_parser.add_argument(
+        '--eps', type=float, default=0.5,
+        help='Cosine-distance threshold for joining a cluster (default: 0.5).')
+    scan_parser.add_argument(
+        '--min-samples', type=int, default=2,
+        help='Minimum faces per cluster; smaller groups are unassigned (default: 2).')
+    scan_parser.add_argument(
+        '--no-review', action='store_true', help='Skip rebuilding the review page.')
+    scan_parser.set_defaults(func=_faces_scan)
+
+    name_parser = faces_sub.add_parser(
+        'name', help='Assign a person name to a cluster.')
+    name_parser.add_argument('--cluster', type=int, required=True, help='Cluster id.')
+    name_parser.add_argument('--name', required=True, help='Person name.')
+    name_parser.set_defaults(func=_faces_name)
+
+    apply_parser = faces_sub.add_parser(
+        'apply', help="Append named clusters' names to the people metadata column.")
+    apply_parser.add_argument(
+        '--execute', action='store_true',
+        help='Write changes (default is a dry run).')
+    apply_parser.set_defaults(func=_faces_apply)
+
+    faces_sub.add_parser('status', help='Show face index and cluster status.') \
+        .set_defaults(func=_faces_status)
 
     args = parser.parse_args(argv)
     args.func(args)
