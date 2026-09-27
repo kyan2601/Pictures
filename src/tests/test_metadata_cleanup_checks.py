@@ -1,4 +1,6 @@
 import os
+
+import pandas as pd
 from datetime import datetime
 
 import pytest
@@ -208,3 +210,107 @@ class TestCheckForDeletedMedia:
         assert len(backup_dirs) == 1
         deleted_csv = backup_dirs[0] / 'deleted_metadata_2025.csv'
         assert deleted_csv.exists()
+
+
+def _write_jpeg(path, color=(255, 0, 0)):
+    Image.new('RGB', (40, 40), color=color).save(str(path), 'JPEG')
+
+
+def _seed_media_records(tmp_root, records):
+    month_dir = tmp_root / '2025' / '06'
+    month_dir.mkdir(parents=True, exist_ok=True)
+    MetadataFile.get_instance(2025).add_media_metadata(records)
+    return month_dir
+
+
+class TestMissingPixelHashes:
+    def _seed(self, tmp_root):
+        month_dir = _seed_media_records(tmp_root, [
+            {'filepath': str(tmp_root / '2025' / '06' / 'hashed.jpg'),
+             'dt': datetime(2025, 6, 1, 10, 0), 'phash': 'abcd1234', 'dhash': 'efgh5678'},
+            {'filepath': str(tmp_root / '2025' / '06' / 'nohash.jpg'),
+             'dt': datetime(2025, 6, 2, 10, 0)},
+        ])
+        _write_jpeg(month_dir / 'hashed.jpg')
+        _write_jpeg(month_dir / 'nohash.jpg', color=(0, 255, 0))
+        return month_dir
+
+    def test_dry_run_reports_but_does_not_backfill(self, tmp_root, capsys):
+        self._seed(tmp_root)
+
+        result = MetadataCleanupChecks(2025)._check_for_missing_pixel_hashes(dry_run=True)
+
+        assert result is False
+        assert '1 picture(s) missing pixel hashes' in capsys.readouterr().out
+        record = MetadataFile.get_instance(2025).get_media_metadata(
+            str(tmp_root / '2025' / '06' / 'nohash.jpg'))
+        assert pd.isna(record['phash'])
+
+    def test_execute_backfills_hashes(self, tmp_root):
+        self._seed(tmp_root)
+
+        result = MetadataCleanupChecks(2025)._check_for_missing_pixel_hashes(dry_run=False)
+
+        assert result is True
+        record = MetadataFile.get_instance(2025).get_media_metadata(
+            str(tmp_root / '2025' / '06' / 'nohash.jpg'))
+        assert record['phash'] and record['dhash']
+        assert len(record['phash']) == 16  # imagehash hex digest
+
+    def test_returns_true_when_all_hashes_present(self, tmp_root):
+        month_dir = _seed_media_records(tmp_root, [
+            {'filepath': str(tmp_root / '2025' / '06' / 'hashed.jpg'),
+             'dt': datetime(2025, 6, 1, 10, 0), 'phash': 'abcd1234', 'dhash': 'efgh5678'},
+        ])
+        _write_jpeg(month_dir / 'hashed.jpg')
+
+        assert MetadataCleanupChecks(2025)._check_for_missing_pixel_hashes(dry_run=False) is True
+
+    def test_videos_are_not_required_to_have_hashes(self, tmp_root):
+        month_dir = _seed_media_records(tmp_root, [
+            {'filepath': str(tmp_root / '2025' / '06' / 'clip.mp4'),
+             'dt': datetime(2025, 6, 1, 10, 0)},
+        ])
+        (month_dir / 'clip.mp4').write_bytes(b'fake-video-bytes')
+
+        assert MetadataCleanupChecks(2025)._check_for_missing_pixel_hashes(dry_run=False) is True
+
+
+class TestUnreadableFiles:
+    def _seed(self, tmp_root):
+        month_dir = _seed_media_records(tmp_root, [
+            {'filepath': str(tmp_root / '2025' / '06' / 'good.jpg'),
+             'dt': datetime(2025, 6, 1, 10, 0)},
+            {'filepath': str(tmp_root / '2025' / '06' / 'corrupt.jpg'),
+             'dt': datetime(2025, 6, 2, 10, 0)},
+            {'filepath': str(tmp_root / '2025' / '06' / 'empty.mp4'),
+             'dt': datetime(2025, 6, 3, 10, 0)},
+            {'filepath': str(tmp_root / '2025' / '06' / 'gone.jpg'),
+             'dt': datetime(2025, 6, 4, 10, 0)},
+        ])
+        _write_jpeg(month_dir / 'good.jpg')
+        (month_dir / 'corrupt.jpg').write_bytes(b'this is not a jpeg')
+        (month_dir / 'empty.mp4').write_bytes(b'')
+        # gone.jpg is indexed but absent from disk: owned by _check_for_deleted_media
+        return month_dir
+
+    def test_flags_corrupt_and_empty_files(self, tmp_root, capsys):
+        self._seed(tmp_root)
+
+        result = MetadataCleanupChecks(2025)._check_for_unreadable_files()
+
+        assert result is False
+        out = capsys.readouterr().out
+        assert 'corrupt.jpg' in out
+        assert 'empty.mp4' in out
+        assert 'good.jpg' not in out
+        assert 'gone.jpg' not in out  # missing files belong to the deleted-media check
+
+    def test_returns_true_when_all_readable(self, tmp_root):
+        month_dir = _seed_media_records(tmp_root, [
+            {'filepath': str(tmp_root / '2025' / '06' / 'good.jpg'),
+             'dt': datetime(2025, 6, 1, 10, 0)},
+        ])
+        _write_jpeg(month_dir / 'good.jpg')
+
+        assert MetadataCleanupChecks(2025)._check_for_unreadable_files() is True
