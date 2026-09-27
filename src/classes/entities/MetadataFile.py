@@ -37,6 +37,11 @@ class MetadataFile:
         # Convert pd.NA/NaN back to None for consistency with Python objects
         # This ensures MediaEntry objects have None instead of pd.NA when loading from CSV
         self.df = self.df.where(pd.notna(self.df), None)
+        # Backward compatibility: CSVs written before a metadata column existed
+        # get None for it, so _write_preprocessing's column selection never KeyErrors.
+        for col in constants.METADATA_COLS:
+            if col not in self.df.columns:
+                self.df[col] = None
 
     def load(self):
         if not os.path.exists(self.filepath):

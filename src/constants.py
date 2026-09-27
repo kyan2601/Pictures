@@ -9,7 +9,8 @@ REVIEW_DIR = os.path.join(ROOT_DIR, 'review')
 
 METADATA_FILENAME = 'metadata.csv'
 METADATA_COLS = ['filepath', 'dt', 'width', 'height',
-                 'latitude', 'longitude', 'altitude', 'orientation',
+                 'latitude', 'longitude', 'location_city', 'location_country',
+                 'altitude', 'orientation',
                  'title', 'tags', 'people', 'comments', 'event_id', 'is_highlight',
                  'phash', 'dhash']
 
