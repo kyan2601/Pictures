@@ -9,6 +9,7 @@ from src.classes.workflows.AssignDate import AssignDate
 from src.classes.workflows.AssignEvent import AssignEvent
 from src.classes.workflows.DuplicateImageCheck import DuplicateImageCheck
 from src.classes.workflows.GallerySite import GallerySite
+from src.classes.workflows.HighlightReel import HighlightReel
 from src.classes.workflows.LibraryStats import LibraryStats
 from src.classes.workflows.MemoryLane import MemoryLane
 from src.classes.workflows.MetadataCleanupChecks import MetadataCleanupChecks
@@ -86,6 +87,10 @@ def _stats(args):
 
 def _memory_lane(args):
     MemoryLane().run(month=args.month, day=args.day, limit_per_year=args.limit)
+
+
+def _highlight_reel(args):
+    HighlightReel().run(year=args.year, limit=args.limit)
 
 
 def main(argv=None):
@@ -200,6 +205,14 @@ def main(argv=None):
     memory_lane_parser.add_argument(
         '--limit', type=int, default=12, help='Max photos per year (default: 12).')
     memory_lane_parser.set_defaults(func=_memory_lane)
+
+    highlight_reel_parser = subparsers.add_parser(
+        'highlight-reel', help='Build a best-of-year gallery page from highlights.')
+    highlight_reel_parser.add_argument(
+        '--year', type=int, help='Year (defaults to the latest year with highlights).')
+    highlight_reel_parser.add_argument(
+        '--limit', type=int, default=100, help='Max photos in the reel (default: 100).')
+    highlight_reel_parser.set_defaults(func=_highlight_reel)
 
     args = parser.parse_args(argv)
     args.func(args)
