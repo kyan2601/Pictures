@@ -178,3 +178,43 @@ class TestMarkReviewed:
 
         with pytest.raises(ValueError, match='No review page found'):
             cli.main(['mark-reviewed', '--category', 'duplicate-check', '--page', 'nope'])
+
+
+class TestAnnotate:
+    def test_defaults_to_dry_run_and_passes_fields(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AnnotateMedia', fake)
+
+        cli.main(['annotate', '--files', 'a.jpg', 'b.jpg', '--title', 'Trip',
+                  '--tags', 'beach,sun', '--people', 'alice', '--comments', 'nice',
+                  '--highlight'])
+
+        assert fake.instances[0].kwargs == {'dry_run': True}
+        assert fake.instances[0].run_calls == [
+            ((['a.jpg', 'b.jpg'],),
+             {'title': 'Trip', 'tags': 'beach,sun', 'people': 'alice',
+              'comments': 'nice', 'is_highlight': True})]
+
+    def test_no_highlight_flag(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AnnotateMedia', fake)
+
+        cli.main(['annotate', '--files', 'a.jpg', '--no-highlight'])
+
+        assert fake.instances[0].run_calls[0][1]['is_highlight'] is False
+
+    def test_highlight_defaults_to_none(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AnnotateMedia', fake)
+
+        cli.main(['annotate', '--files', 'a.jpg', '--title', 'Trip'])
+
+        assert fake.instances[0].run_calls[0][1]['is_highlight'] is None
+
+    def test_execute_flag_disables_dry_run(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'AnnotateMedia', fake)
+
+        cli.main(['annotate', '--files', 'a.jpg', '--title', 'Trip', '--execute'])
+
+        assert fake.instances[0].kwargs == {'dry_run': False}

@@ -3,6 +3,7 @@ import os
 
 from src import constants, helper
 from src.adhoc.cleanup_backups import main as cleanup_backups_main
+from src.classes.workflows.AnnotateMedia import AnnotateMedia
 from src.classes.workflows.AssignDate import AssignDate
 from src.classes.workflows.DuplicateImageCheck import DuplicateImageCheck
 from src.classes.workflows.GallerySite import GallerySite
@@ -37,6 +38,12 @@ def _mark_reviewed(args):
     page_path = os.path.join(constants.REVIEW_DIR, args.category, f'{args.page}.html')
     GallerySite(constants.REVIEW_DIR).mark_reviewed(page_path)
     print(f'Marked as reviewed: {page_path}')
+
+
+def _annotate(args):
+    AnnotateMedia(dry_run=not args.execute).run(
+        args.files, title=args.title, tags=args.tags, people=args.people,
+        comments=args.comments, is_highlight=args.is_highlight)
 
 
 def main(argv=None):
@@ -83,6 +90,24 @@ def main(argv=None):
         '--category', required=True, help="Review category (e.g. 'duplicate-check').")
     mark_reviewed_parser.add_argument('--page', required=True, help="Page id (e.g. '2022-05').")
     mark_reviewed_parser.set_defaults(func=_mark_reviewed)
+
+    annotate_parser = subparsers.add_parser(
+        'annotate', help='Edit metadata annotations (title, tags, people, comments, highlight).')
+    annotate_parser.add_argument(
+        '--files', nargs='+', required=True, help='Filepaths to annotate (as listed in metadata.csv).')
+    annotate_parser.add_argument('--title', help='Set the title.')
+    annotate_parser.add_argument('--tags', help='Set tags (comma- or semicolon-separated).')
+    annotate_parser.add_argument('--people', help='Set people (comma- or semicolon-separated).')
+    annotate_parser.add_argument('--comments', help='Set comments.')
+    highlight_group = annotate_parser.add_mutually_exclusive_group()
+    highlight_group.add_argument(
+        '--highlight', dest='is_highlight', action='store_true', default=None,
+        help='Mark as highlight.')
+    highlight_group.add_argument(
+        '--no-highlight', dest='is_highlight', action='store_false',
+        help='Unmark highlight.')
+    annotate_parser.add_argument('--execute', action='store_true', help='Apply changes (default is dry run).')
+    annotate_parser.set_defaults(func=_annotate)
 
     args = parser.parse_args(argv)
     args.func(args)
