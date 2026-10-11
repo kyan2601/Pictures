@@ -17,6 +17,7 @@ from src.classes.workflows.MemoryLane import MemoryLane
 from src.classes.workflows.MetadataCleanupChecks import MetadataCleanupChecks
 from src.classes.workflows.ProcessNewMedia import ProcessNewMedia
 from src.classes.workflows.SearchMedia import SearchMedia
+from src.classes.workflows.YearInReview import YearInReview
 
 
 def _process_new(args):
@@ -93,6 +94,10 @@ def _memory_lane(args):
 
 def _highlight_reel(args):
     HighlightReel().run(year=args.year, limit=args.limit)
+
+
+def _year_in_review(args):
+    YearInReview().run(year=args.year, regenerate=args.regenerate)
 
 
 def _faces_scan(args):
@@ -237,6 +242,16 @@ def main(argv=None):
     highlight_reel_parser.add_argument(
         '--limit', type=int, default=100, help='Max photos in the reel (default: 100).')
     highlight_reel_parser.set_defaults(func=_highlight_reel)
+
+    year_in_review_parser = subparsers.add_parser(
+        'year-in-review',
+        help='Build a year-in-review gallery page (serves the saved page if one exists).')
+    year_in_review_parser.add_argument(
+        '--year', type=int, help='Year (defaults to the latest year in the library).')
+    year_in_review_parser.add_argument(
+        '--regenerate', action='store_true',
+        help='Rebuild the page even if it already exists (default: serve the existing page).')
+    year_in_review_parser.set_defaults(func=_year_in_review)
 
     faces_parser = subparsers.add_parser(
         'faces', help='Face detection, clustering and naming.')
