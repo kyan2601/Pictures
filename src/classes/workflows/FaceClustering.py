@@ -321,6 +321,90 @@ class FaceClustering:
             label = names.get(str(cid), '(unnamed)')
             print(f'  cluster {cid}: {size} face(s) — {label}')
 
+    def coverage(self, top=15):
+        """Reports how much of the detected face universe is named, plus a
+        ranked worklist of the unnamed clusters that would tag the most
+        photos if named next."""
+        assignments = _load_clusters()
+        names = _load_names()
+        if not assignments:
+            print('No face clusters yet. Run: python -m src.cli faces scan')
+            return None
+
+        clusters = {}
+        for key, cid in assignments.items():
+            filepath = key.split(_KEY_SEP)[0]
+            entry = clusters.setdefault(
+                cid, {'faces': 0, 'files': set(), 'years': set()})
+            entry['faces'] += 1
+            entry['files'].add(filepath)
+            try:
+                year = helper.get_year_from_filepath(filepath)
+            except Exception:
+                year = None
+            if year:
+                entry['years'].add(year)
+
+        def _faces_where(predicate):
+            return sum(c['faces'] for cid, c in clusters.items() if predicate(cid))
+
+        def _files_where(predicate):
+            files = set()
+            for cid, c in clusters.items():
+                if predicate(cid):
+                    files |= c['files']
+            return files
+
+        is_named = lambda cid: cid != UNASSIGNED and str(cid) in names
+        is_unnamed = lambda cid: cid != UNASSIGNED and str(cid) not in names
+
+        total_faces = len(assignments)
+        named_faces = _faces_where(is_named)
+        unnamed_faces = _faces_where(is_unnamed)
+        unassigned_faces = clusters.get(UNASSIGNED, {'faces': 0})['faces']
+        photos_with_faces = _files_where(lambda cid: True)
+        photos_with_named = _files_where(is_named)
+
+        def _pct(part, whole):
+            return f'{100 * part / whole:.0f}%' if whole else '—'
+
+        print(f'Faces: {total_faces} total — {named_faces} named '
+              f'({_pct(named_faces, total_faces)}), {unnamed_faces} in unnamed '
+              f'clusters, {unassigned_faces} unassigned.')
+        print(f'Photos: {len(photos_with_faces)} contain faces — '
+              f'{len(photos_with_named)} have at least one named face '
+              f'({_pct(len(photos_with_named), len(photos_with_faces))}).')
+
+        worklist = sorted(
+            (cid for cid in clusters if is_unnamed(cid)),
+            key=lambda cid: (-clusters[cid]['faces'],
+                             -len(clusters[cid]['files']), cid))
+        if worklist:
+            print('\nBiggest unnamed clusters — name these to tag the most photos:')
+            for cid in worklist[:top]:
+                c = clusters[cid]
+                years = ''
+                if c['years']:
+                    lo, hi = min(c['years']), max(c['years'])
+                    years = f', {lo}' if lo == hi else f', {lo}–{hi}'
+                print(f"  cluster {cid}: {c['faces']} face(s) in "
+                      f"{len(c['files'])} photo(s){years} — "
+                      f'faces name --cluster {cid} --name "..."')
+            if len(worklist) > top:
+                print(f'  … and {len(worklist) - top} more unnamed cluster(s).')
+        else:
+            print('\nEvery cluster is named. 🎉')
+
+        return {
+            'total_faces': total_faces,
+            'named_faces': named_faces,
+            'unnamed_faces': unnamed_faces,
+            'unassigned_faces': unassigned_faces,
+            'photos_with_faces': len(photos_with_faces),
+            'photos_with_named': len(photos_with_named),
+            'worklist': worklist,
+        }
+
     def name_cluster(self, cluster_id, name):
         names = _load_names()
         names[str(int(cluster_id))] = name.strip()
