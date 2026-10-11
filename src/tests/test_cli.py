@@ -355,6 +355,26 @@ class TestStats:
         assert fake.instances[0].run_calls == [((), {'years': None})]
 
 
+class TestStatsPage:
+    def test_page_defaults(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'LibraryStats', fake)
+
+        cli.main(['stats', 'page'])
+
+        assert fake.instances[0].calls == [
+            ('build_health_page', (), {'regenerate': False})]
+
+    def test_page_regenerate(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'LibraryStats', fake)
+
+        cli.main(['stats', 'page', '--regenerate'])
+
+        assert fake.instances[0].calls == [
+            ('build_health_page', (), {'regenerate': True})]
+
+
 class TestMemoryLane:
     def test_passes_args_through(self, monkeypatch):
         fake = _fresh_fake_class()
@@ -484,22 +504,6 @@ class TestFaces:
         cli.main(['faces', 'status'])
 
         assert fake.instances[0].calls == [('status', (), {})]
-
-    def test_coverage(self, monkeypatch):
-        fake = _fresh_faces_fake()
-        monkeypatch.setattr(cli, 'FaceClustering', fake)
-
-        cli.main(['faces', 'coverage'])
-
-        assert fake.instances[0].calls == [('coverage', (), {'top': 15})]
-
-    def test_coverage_top(self, monkeypatch):
-        fake = _fresh_faces_fake()
-        monkeypatch.setattr(cli, 'FaceClustering', fake)
-
-        cli.main(['faces', 'coverage', '--top', '5'])
-
-        assert fake.instances[0].calls == [('coverage', (), {'top': 5})]
 
 
 class TestLocation:
