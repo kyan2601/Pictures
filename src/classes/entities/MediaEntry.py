@@ -16,6 +16,8 @@ class MediaEntry(ABC):
         self.height = None
         self.latitude = None
         self.longitude = None
+        self.location_city = None
+        self.location_country = None
         self.altitude = None
         self.orientation = None
         self.title = None
