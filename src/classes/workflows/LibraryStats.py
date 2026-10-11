@@ -56,6 +56,7 @@ class LibraryStats:
             'missing_files': 0,
             'titled': 0, 'tagged': 0, 'with_people': 0, 'commented': 0,
             'highlights': 0, 'in_events': 0, 'pictures_with_hash': 0,
+            'with_location': 0, 'with_gps': 0,
             'months': {},
         }
         if df is None or df.empty:
@@ -90,6 +91,10 @@ class LibraryStats:
                 stats['in_events'] += 1
             if media_type == 'picture' and _has_text(row.get('phash')):
                 stats['pictures_with_hash'] += 1
+            if _has_text(row.get('location_city')):
+                stats['with_location'] += 1
+            if pd.notna(row.get('latitude')) and pd.notna(row.get('longitude')):
+                stats['with_gps'] += 1
 
             dt = row.get('dt')
             month = dt.strftime('%Y-%m') if pd.notna(dt) else 'unknown'
@@ -144,3 +149,104 @@ class LibraryStats:
         total_pages, pending_pages = GallerySite(constants.REVIEW_DIR).get_review_stats()
         print(f'Events: {event_count}')
         print(f'Review pages: {total_pages} total, {pending_pages} pending')
+
+    # ------------------------------------------------------------------
+    # Library health page: the run() numbers as a persistent gallery page,
+    # with coverage percentages and a biggest-gaps summary, so cleanup
+    # effort can be aimed at the years/dimensions that need it most.
+    # ------------------------------------------------------------------
+
+    HEALTH_CATEGORY = 'library-health'
+
+    # (stats key, denominator key, display label)
+    _COVERAGE_DIMENSIONS = [
+        ('titled', 'files', 'Titled'),
+        ('tagged', 'files', 'Tagged'),
+        ('with_people', 'files', 'People'),
+        ('with_location', 'files', 'Location'),
+        ('with_gps', 'files', 'GPS'),
+        ('pictures_with_hash', 'pictures', 'Hashed'),
+    ]
+
+    @staticmethod
+    def _pct(part, whole):
+        return f'{100 * part / whole:.0f}%' if whole else '—'
+
+    def _coverage_phrase(self, stats):
+        return ' · '.join(
+            f'{label} {self._pct(stats[key], stats[denom])}'
+            for key, denom, label in self._COVERAGE_DIMENSIONS)
+
+    def _health_sections(self, per_year):
+        totals = {}
+        for s in per_year.values():
+            for key, value in s.items():
+                if isinstance(value, int):
+                    totals[key] = totals.get(key, 0) + value
+
+        years = sorted(per_year)
+        span = f'{years[0]}' if years[0] == years[-1] else f'{years[0]}–{years[-1]}'
+        glance = (f"{totals['files']} files · {totals['pictures']} photos · "
+                  f"{totals['videos']} videos · {_human_size(totals['bytes'])} · "
+                  f"{totals['highlights']} highlights · "
+                  f"{totals['in_events']} in events · {span}")
+        sections = [{'heading': 'Library at a glance',
+                     'note': glance + ' · ' + self._coverage_phrase(totals),
+                     'items': []}]
+
+        for year in sorted(per_year, reverse=True):
+            s = per_year[year]
+            note = (f"{s['files']} files · {_human_size(s['bytes'])} · "
+                    f"{s['highlights']} highlights · "
+                    + self._coverage_phrase(s))
+            sections.append({'heading': str(year), 'note': note, 'items': []})
+
+        gap_lines = []
+        for key, denom, label in self._COVERAGE_DIMENSIONS:
+            total_missing = totals[denom] - totals[key]
+            if total_missing <= 0:
+                continue
+            worst_year, worst_missing, worst_denom = None, -1, 0
+            for year in years:
+                s = per_year[year]
+                missing = s[denom] - s[key]
+                if missing > worst_missing:
+                    worst_year, worst_missing, worst_denom = year, missing, s[denom]
+            gap_lines.append(
+                f'{label}: {total_missing} missing overall — worst in '
+                f'{worst_year} ({worst_missing} of {worst_denom}, '
+                f'{self._pct(worst_missing, worst_denom)} missing)')
+        sections.append({
+            'heading': 'Biggest gaps',
+            'note': '\n'.join(gap_lines) if gap_lines else 'No coverage gaps found.',
+            'items': [],
+        })
+        return sections
+
+    def build_health_page(self, regenerate=False):
+        """Builds (or serves) review/library-health/index.html: per-year
+        annotation/location/hash coverage with a biggest-gaps summary.
+        Re-running serves the saved page; regenerate=True rebuilds it."""
+        page_path = os.path.join(
+            constants.REVIEW_DIR, self.HEALTH_CATEGORY, 'index.html')
+        if os.path.exists(page_path) and not regenerate:
+            print(f'Library health page already exists: {page_path}')
+            print('Serving the existing page. '
+                  'Re-run with --regenerate to rebuild it.')
+            return page_path
+
+        per_year = {}
+        for year in helper.get_years_with_metadata():
+            per_year[year] = self._stats_for_year(MetadataFile.get_instance(year).df)
+        if not per_year:
+            print('No metadata found.')
+            return None
+
+        sections = self._health_sections(per_year)
+        written = GallerySite(constants.REVIEW_DIR).add_page(
+            self.HEALTH_CATEGORY, 'index', 'Library Health', sections)
+        total_files = sum(s['files'] for s in per_year.values())
+        print(f'Library health: {total_files} file(s) across '
+              f'{len(per_year)} year(s).')
+        print(f'Page: {written}')
+        return written
