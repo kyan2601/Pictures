@@ -502,6 +502,26 @@ class TestFaces:
         assert fake.instances[0].calls == [('coverage', (), {'top': 5})]
 
 
+class TestPeople:
+    def test_pages_defaults(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'PeoplePages', fake)
+
+        cli.main(['people', 'pages'])
+
+        assert fake.instances[0].calls == [
+            ('run', (), {'regenerate': False, 'min_photos': 3})]
+
+    def test_pages_regenerate_and_min_photos(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'PeoplePages', fake)
+
+        cli.main(['people', 'pages', '--regenerate', '--min-photos', '5'])
+
+        assert fake.instances[0].calls == [
+            ('run', (), {'regenerate': True, 'min_photos': 5})]
+
+
 class TestLocation:
     def test_enrich_passes_args_through(self, monkeypatch):
         fake = _fresh_faces_fake()
