@@ -395,6 +395,26 @@ class TestHighlightReel:
             ((), {'year': None, 'limit': 100})]
 
 
+class TestYearInReview:
+    def test_passes_args_through(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'YearInReview', fake)
+
+        cli.main(['year-in-review', '--year', '2024', '--regenerate'])
+
+        assert fake.instances[0].run_calls == [
+            ((), {'year': 2024, 'regenerate': True})]
+
+    def test_defaults(self, monkeypatch):
+        fake = _fresh_fake_class()
+        monkeypatch.setattr(cli, 'YearInReview', fake)
+
+        cli.main(['year-in-review'])
+
+        assert fake.instances[0].run_calls == [
+            ((), {'year': None, 'regenerate': False})]
+
+
 def _fresh_faces_fake():
     class FakeFaces:
         instances = []
