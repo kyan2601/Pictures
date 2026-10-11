@@ -501,6 +501,32 @@ class TestFaces:
 
         assert fake.instances[0].calls == [('coverage', (), {'top': 5})]
 
+    def test_merge(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'merge', '3', '7', '9'])
+
+        assert fake.instances[0].calls == [('merge_clusters', ([3, 7, 9],), {})]
+
+    def test_split_defaults(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'split', '--cluster', '4'])
+
+        assert fake.instances[0].calls == [
+            ('split_cluster', (4,), {'eps': 0.35})]
+
+    def test_split_eps(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'split', '--cluster', '4', '--eps', '0.3'])
+
+        assert fake.instances[0].calls == [
+            ('split_cluster', (4,), {'eps': 0.3})]
+
 
 class TestLocation:
     def test_enrich_passes_args_through(self, monkeypatch):
