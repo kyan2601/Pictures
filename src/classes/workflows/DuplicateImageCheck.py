@@ -11,6 +11,7 @@ from src import helper, constants
 from src.classes import media_class_factory
 from src.classes.entities.PictureEntry import PictureEntry
 from src.classes.workflows.GallerySite import GallerySite
+from src.classes.workflows.LibraryStats import _human_size
 
 register_heif_opener()
 
@@ -152,6 +153,23 @@ class DuplicateImageCheck:
              
         return categorized
     
+    def _item_details(self, filepath: str) -> list[str]:
+        """Comparison details shown on the review page for one candidate:
+        dimensions, capture datetime, and file size."""
+        entry = self.picture_entries[filepath]
+        details = []
+        width, height = getattr(entry, 'width', None), getattr(entry, 'height', None)
+        if width and height:
+            details.append(f'{width} × {height}')
+        dt = getattr(entry, 'dt', None)
+        if dt is not None:
+            details.append(dt.strftime('%Y-%m-%d %H:%M') if hasattr(dt, 'strftime') else str(dt))
+        try:
+            details.append(_human_size(os.path.getsize(filepath)))
+        except OSError:
+            pass
+        return details
+
     def _handle_groups(self, groups: list[list[str]], dry_run: bool):
         """Processes categorized groups to select the best image and optionally remove others."""
         all_categorized_subgroups = []
@@ -197,7 +215,9 @@ class DuplicateImageCheck:
                         raise RuntimeError(f"Not possible, shouldn't logically be able to get here")
                     actions[p] = action
                     print(f"  [{action}] {p} (Score: {s:.2f})")
-                    gallery_items.append({'filepath': p, 'label': f'Score {s:.2f}', 'tag': action.lower()})
+                    gallery_items.append({'filepath': p, 'label': f'Score {s:.2f}',
+                                          'tag': action.lower(),
+                                          'details': self._item_details(p)})
 
                 gallery_sections.append({
                     'heading': f'Group {i + 1} — Duplicate',
@@ -220,7 +240,8 @@ class DuplicateImageCheck:
 
                 gallery_sections.append({
                     'heading': f'Group {i + 1} — Similar (review manually)',
-                    'items': [{'filepath': img} for img in imgs],
+                    'items': [{'filepath': img, 'details': self._item_details(img)}
+                              for img in imgs],
                 })
 
             else:
@@ -233,6 +254,7 @@ class DuplicateImageCheck:
                 page_id=page_id,
                 title=f'Duplicate check — {page_id}',
                 sections=gallery_sections,
+                variant='compare',
             )
             print(f"\n[-] Review page written: {page_path}")
 
