@@ -393,3 +393,74 @@ class TestHighlightReel:
 
         assert fake.instances[0].run_calls == [
             ((), {'year': None, 'limit': 100})]
+
+
+def _fresh_faces_fake():
+    class FakeFaces:
+        instances = []
+
+        def __init__(self, *args, **kwargs):
+            self.calls = []
+            FakeFaces.instances.append(self)
+
+        def __getattr__(self, name):
+            def rec(*args, **kwargs):
+                self.calls.append((name, args, kwargs))
+            return rec
+
+    return FakeFaces
+
+
+class TestFaces:
+    def test_scan_passes_args_through(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'scan', '--years', '2024', '2025',
+                  '--eps', '0.4', '--min-samples', '3', '--no-review'])
+
+        assert fake.instances[0].calls == [
+            ('scan', (), {'years': [2024, 2025], 'eps': 0.4,
+                          'min_samples': 3, 'build_review': False})]
+
+    def test_scan_defaults(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'scan'])
+
+        assert fake.instances[0].calls == [
+            ('scan', (), {'years': None, 'eps': 0.5,
+                          'min_samples': 2, 'build_review': True})]
+
+    def test_name(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'name', '--cluster', '3', '--name', 'Mom'])
+
+        assert fake.instances[0].calls == [('name_cluster', (3, 'Mom'), {})]
+
+    def test_apply_defaults_to_dry_run(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'apply'])
+
+        assert fake.instances[0].calls == [('apply_names', (), {'dry_run': True})]
+
+    def test_apply_execute(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'apply', '--execute'])
+
+        assert fake.instances[0].calls == [('apply_names', (), {'dry_run': False})]
+
+    def test_status(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'status'])
+
+        assert fake.instances[0].calls == [('status', (), {})]
