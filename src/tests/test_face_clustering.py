@@ -300,3 +300,78 @@ class TestCoverage:
 
         assert summary['worklist'] == []
         assert 'Every cluster is named' in capsys.readouterr().out
+
+
+class TestMergeSplit:
+    def _scan_two_identities(self, tmp_root, fake_faces, **scan_kwargs):
+        mapping, _ = fake_faces
+        files = _seed(tmp_root)
+        mapping[files['a.jpg']] = [G1[0]]
+        mapping[files['b.jpg']] = [G1[1]]
+        mapping[files['c.jpg']] = [G1[2]]
+        mapping[files['d.jpg']] = [G2[0]]
+        mapping[files['e.jpg']] = [G2[1]]
+        FaceClustering().scan(years=[2024], build_review=False, **scan_kwargs)
+        assignments = FC._load_clusters()
+        return files, _cid(assignments, files['a.jpg']), _cid(assignments, files['d.jpg'])
+
+    def test_merge_combines_clusters(self, tmp_root, fake_faces):
+        files, g1, g2 = self._scan_two_identities(tmp_root, fake_faces)
+
+        summary = FaceClustering().merge_clusters([g2, g1])
+
+        assert summary == {'target': g2, 'sources': [g1], 'faces': 5,
+                           'name': None, 'dropped_names': []}
+        assignments = FC._load_clusters()
+        assert {c for c in assignments.values()} == {g2}
+
+    def test_merge_inherits_name_from_largest_named_source(self, tmp_root, fake_faces):
+        files, g1, g2 = self._scan_two_identities(tmp_root, fake_faces)
+        FaceClustering().name_cluster(g1, 'Alice')
+
+        summary = FaceClustering().merge_clusters([g2, g1])
+
+        assert summary['name'] == 'Alice'
+        assert FC._load_names() == {str(g2): 'Alice'}
+
+    def test_merge_keeps_survivor_name_and_reports_dropped(self, tmp_root, fake_faces, capsys):
+        files, g1, g2 = self._scan_two_identities(tmp_root, fake_faces)
+        FaceClustering().name_cluster(g1, 'Alice')
+        FaceClustering().name_cluster(g2, 'Bob')
+
+        summary = FaceClustering().merge_clusters([g2, g1])
+
+        assert summary['name'] == 'Bob'
+        assert summary['dropped_names'] == ['Alice']
+        assert 'Dropped name(s): Alice' in capsys.readouterr().out
+        assert FC._load_names() == {str(g2): 'Bob'}
+
+    def test_merge_rejects_unknown_and_single(self, tmp_root, fake_faces):
+        files, g1, g2 = self._scan_two_identities(tmp_root, fake_faces)
+
+        assert FaceClustering().merge_clusters([g1, 999]) is None
+        assert FaceClustering().merge_clusters([g1]) is None
+        assert {c for c in FC._load_clusters().values()} == {g1, g2}
+
+    def test_split_separates_two_people(self, tmp_root, fake_faces):
+        # eps=1.5 forces both identities into a single cluster at scan time.
+        files, both, _ = self._scan_two_identities(tmp_root, fake_faces, eps=1.5)
+        FaceClustering().name_cluster(both, 'Alice')
+
+        summary = FaceClustering().split_cluster(both, eps=0.35)
+
+        assert summary['kept'] == 3
+        assert len(summary['new']) == 1
+        new_id, new_size = summary['new'][0]
+        assert new_size == 2
+        assignments = FC._load_clusters()
+        assert _cid(assignments, files['a.jpg']) == both       # G1 keeps the id
+        assert _cid(assignments, files['d.jpg']) == new_id     # G2 split off
+        assert FC._load_names() == {str(both): 'Alice'}        # name stays with keeper
+
+    def test_split_no_op_when_nothing_separates(self, tmp_root, fake_faces):
+        files, both, _ = self._scan_two_identities(tmp_root, fake_faces, eps=1.5)
+        before = FC._load_clusters()
+
+        assert FaceClustering().split_cluster(both, eps=1.5) is None
+        assert FC._load_clusters() == before

@@ -405,6 +405,129 @@ class FaceClustering:
             'worklist': worklist,
         }
 
+    def merge_clusters(self, cluster_ids):
+        """Merges several clusters into the first one listed (the survivor).
+
+        For when one person landed in multiple clusters (faces change over
+        the years). Name resolution: the survivor keeps its own name; if it
+        has none, it inherits the name of the largest named source cluster.
+        Any other source names are dropped and reported — never silently.
+        Recorded in clusters.json/names.json; a later rescan re-clusters
+        from embeddings and may re-split, with names carried by overlap.
+        """
+        assignments = _load_clusters()
+        names = _load_names()
+        live = {c for c in assignments.values() if c != UNASSIGNED}
+        ids = list(dict.fromkeys(int(c) for c in cluster_ids))
+        if len(ids) < 2:
+            print('Merge needs at least two distinct cluster ids.')
+            return None
+        unknown = [c for c in ids if c not in live]
+        if unknown:
+            print(f'Unknown cluster id(s): {unknown}. '
+                  'Run faces status to see live clusters.')
+            return None
+
+        target, sources = ids[0], ids[1:]
+        sizes = {c: sum(1 for v in assignments.values() if v == c) for c in ids}
+        for key, cid in assignments.items():
+            if cid in sources:
+                assignments[key] = target
+
+        dropped = []
+        inherited = None
+        if str(target) in names:
+            dropped = [names[str(c)] for c in sources if str(c) in names]
+        else:
+            named_sources = [c for c in sources if str(c) in names]
+            if named_sources:
+                largest = max(named_sources, key=lambda c: sizes[c])
+                inherited = names[str(largest)]
+                names[str(target)] = inherited
+                dropped = [names[str(c)] for c in named_sources if c != largest]
+        for c in sources:
+            names.pop(str(c), None)
+
+        _save_clusters(assignments)
+        _save_names(names)
+
+        total = sum(sizes.values())
+        print(f'Merged cluster(s) {sources} into cluster {target}: '
+              f'{total} face(s) total.')
+        final_name = names.get(str(target))
+        if inherited:
+            print(f'Cluster {target} inherits the name "{inherited}".')
+        elif final_name:
+            print(f'Cluster {target} keeps the name "{final_name}".')
+        if dropped:
+            print(f'Dropped name(s): {", ".join(dropped)} — re-add with '
+                  f'faces name if that was wrong.')
+        return {'target': target, 'sources': sources, 'faces': total,
+                'name': final_name, 'dropped_names': dropped}
+
+    def split_cluster(self, cluster_id, eps=0.35):
+        """Splits one cluster into two or more by re-clustering its members
+        at a tighter eps than the original scan used.
+
+        For when two people landed in one cluster. The largest resulting
+        group keeps the original cluster id and its name; the other groups
+        get fresh ids and start unnamed (they are, by definition, someone
+        else). If everything still groups together at this eps, nothing
+        changes. Recorded in clusters.json; a later rescan re-clusters
+        from embeddings and may re-merge, with names carried by overlap.
+        """
+        cluster_id = int(cluster_id)
+        assignments = _load_clusters()
+        names = _load_names()
+        members = sorted(k for k, c in assignments.items() if c == cluster_id)
+        if len(members) < 2:
+            print(f'Cluster {cluster_id} has fewer than two faces; '
+                  'there is nothing to split.')
+            return None
+
+        index = {}
+        for year in helper.get_years():
+            year_index, _ = _load_index(year)
+            index.update(year_index)
+        missing = [k for k in members if k not in index]
+        if missing:
+            print(f'{len(missing)} face(s) in cluster {cluster_id} have no '
+                  'saved embedding; run faces scan first.')
+            return None
+
+        embeddings = [index[k]['embedding'] for k in members]
+        labels = _greedy_cluster(embeddings, eps=eps, min_samples=1)
+        groups = {}
+        for key, label in zip(members, labels):
+            groups.setdefault(int(label), []).append(key)
+        if len(groups) < 2:
+            print(f'Cluster {cluster_id} did not split at eps={eps}: all '
+                  f'{len(members)} faces still group together. '
+                  'Try a smaller --eps.')
+            return None
+
+        ordered = sorted(groups.values(), key=lambda g: (-len(g), g[0]))
+        keeper = ordered[0]
+        next_id = max(c for c in assignments.values() if c != UNASSIGNED) + 1
+        new_clusters = []
+        for group in ordered[1:]:
+            for key in group:
+                assignments[key] = next_id
+            new_clusters.append((next_id, len(group)))
+            next_id += 1
+        _save_clusters(assignments)
+
+        name = names.get(str(cluster_id))
+        label = f' ("{name}")' if name else ''
+        print(f'Split cluster {cluster_id}{label}: it keeps '
+              f'{len(keeper)} face(s); new unnamed cluster(s): '
+              + ', '.join(f'{cid} ({n} face(s))' for cid, n in new_clusters)
+              + '.')
+        print('Name the new cluster(s) from the review page or with '
+              'faces name --cluster <id> --name "...".')
+        return {'cluster': cluster_id, 'kept': len(keeper),
+                'new': new_clusters, 'name': name}
+
     def name_cluster(self, cluster_id, name):
         names = _load_names()
         names[str(int(cluster_id))] = name.strip()

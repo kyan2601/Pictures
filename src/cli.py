@@ -15,6 +15,7 @@ from src.classes.workflows.LibraryStats import LibraryStats
 from src.classes.workflows.LocationEnrichment import LocationEnrichment
 from src.classes.workflows.MemoryLane import MemoryLane
 from src.classes.workflows.MetadataCleanupChecks import MetadataCleanupChecks
+from src.classes.workflows.PeoplePages import PeoplePages
 from src.classes.workflows.ProcessNewMedia import ProcessNewMedia
 from src.classes.workflows.SearchMedia import SearchMedia
 from src.classes.workflows.YearInReview import YearInReview
@@ -120,6 +121,21 @@ def _faces_apply(args):
 
 def _faces_status(args):
     FaceClustering().status()
+
+
+def _people_pages(args):
+    PeoplePages().run(regenerate=args.regenerate, min_photos=args.min_photos)
+    
+def _faces_coverage(args):
+    FaceClustering().coverage(top=args.top)
+
+
+def _faces_merge(args):
+    FaceClustering().merge_clusters(args.clusters)
+
+
+def _faces_split(args):
+    FaceClustering().split_cluster(args.cluster, eps=args.eps)
 
 
 def _location_enrich(args):
@@ -298,6 +314,43 @@ def main(argv=None):
 
     faces_sub.add_parser('status', help='Show face index and cluster status.') \
         .set_defaults(func=_faces_status)
+
+    people_parser = subparsers.add_parser(
+        'people', help='Per-person gallery pages from the people metadata column.')
+    people_sub = people_parser.add_subparsers(dest='people_command', required=True)
+
+    pages_parser = people_sub.add_parser(
+        'pages', help='Build (or serve) one gallery page per person.')
+    pages_parser.add_argument(
+        '--regenerate', action='store_true',
+        help='Rebuild the pages even if they already exist (default: serve existing).')
+    pages_parser.add_argument(
+        '--min-photos', type=int, default=3,
+        help='Minimum photos for a person to get a page (default: 3).')
+    pages_parser.set_defaults(func=_people_pages)
+    
+    coverage_parser = faces_sub.add_parser(
+        'coverage',
+        help='Show how much of the face universe is named, with a naming worklist.')
+    coverage_parser.add_argument(
+        '--top', type=int, default=15,
+        help='Max unnamed clusters to list (default: 15).')
+    coverage_parser.set_defaults(func=_faces_coverage)
+
+    merge_parser = faces_sub.add_parser(
+        'merge', help='Merge clusters into the first id listed (same person, split clusters).')
+    merge_parser.add_argument(
+        'clusters', type=int, nargs='+',
+        help='Cluster ids to merge; the first one survives.')
+    merge_parser.set_defaults(func=_faces_merge)
+
+    split_parser = faces_sub.add_parser(
+        'split', help='Split a cluster into two or more at a tighter threshold (two people, one cluster).')
+    split_parser.add_argument('--cluster', type=int, required=True, help='Cluster id to split.')
+    split_parser.add_argument(
+        '--eps', type=float, default=0.35,
+        help='Cosine-distance threshold for the split (default: 0.35, tighter than scan).')
+    split_parser.set_defaults(func=_faces_split)
 
     location_parser = subparsers.add_parser(
         'location', help='Offline location enrichment from GPS coordinates.')

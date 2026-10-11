@@ -505,6 +505,68 @@ class TestFaces:
 
         assert fake.instances[0].calls == [('status', (), {})]
 
+    def test_coverage(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'coverage'])
+
+        assert fake.instances[0].calls == [('coverage', (), {'top': 15})]
+
+    def test_coverage_top(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'coverage', '--top', '5'])
+
+        assert fake.instances[0].calls == [('coverage', (), {'top': 5})]
+
+    def test_merge(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'merge', '3', '7', '9'])
+
+        assert fake.instances[0].calls == [('merge_clusters', ([3, 7, 9],), {})]
+
+    def test_split_defaults(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'split', '--cluster', '4'])
+
+        assert fake.instances[0].calls == [
+            ('split_cluster', (4,), {'eps': 0.35})]
+
+    def test_split_eps(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'split', '--cluster', '4', '--eps', '0.3'])
+
+        assert fake.instances[0].calls == [
+            ('split_cluster', (4,), {'eps': 0.3})]
+
+
+class TestPeople:
+    def test_pages_defaults(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'PeoplePages', fake)
+
+        cli.main(['people', 'pages'])
+
+        assert fake.instances[0].calls == [
+            ('run', (), {'regenerate': False, 'min_photos': 3})]
+
+    def test_pages_regenerate_and_min_photos(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'PeoplePages', fake)
+
+        cli.main(['people', 'pages', '--regenerate', '--min-photos', '5'])
+
+        assert fake.instances[0].calls == [
+            ('run', (), {'regenerate': True, 'min_photos': 5})]
+
 
 class TestLocation:
     def test_enrich_passes_args_through(self, monkeypatch):
