@@ -14,6 +14,26 @@ def _write_jpeg(path, color=(255, 0, 0)):
 
 
 class TestAddPage:
+    def test_html_section_renders_raw_markup_without_item_grid(self, tmp_root):
+        review_root = tmp_root / 'review'
+        site = GallerySite(str(review_root), site_title='Test Review')
+        page_path = site.add_page(
+            category='library-health',
+            page_id='index',
+            title='Library Health',
+            sections=[{
+                'heading': 'Library at a glance',
+                'note': '',
+                'items': [],
+                'html': '<div class="stat-card"><div class="stat-value">42</div></div>',
+            }],
+        )
+
+        page_html = open(page_path, encoding='utf-8').read()
+        assert '<div class="stat-card"><div class="stat-value">42</div></div>' in page_html
+        assert '0 items' not in page_html
+        assert '<div class="grid">' not in page_html
+
     def test_generates_page_manifest_and_index(self, tmp_root):
         source_dir = tmp_root / 'source'
         source_dir.mkdir()

@@ -465,6 +465,82 @@ body.compare main {
 }
 
 .compare-group.current .group-heading { color: var(--accent); }
+
+.dash-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.4rem;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.9rem 1rem;
+}
+
+.stat-value {
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.stat-label {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 0.25rem;
+}
+
+.dash-sub {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  margin: 0 0 0.8rem;
+}
+
+.bars {
+  display: grid;
+  gap: 0.55rem;
+  max-width: 720px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 92px 1fr 52px;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.bar-name { color: var(--text-muted); }
+
+.bar-track {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  background: var(--accent);
+}
+
+.bar-fill.good { background: var(--keep); }
+.bar-fill.ok { background: var(--unsure); }
+.bar-fill.low { background: var(--remove); }
+
+.bar-pct {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.82rem;
+  text-align: right;
+}
 """
 
 _FONT_LINK = (
@@ -693,6 +769,11 @@ def _render_section(section, index=0, compare=False):
     heading = html.escape(section['heading'])
     count = len(section['items'])
     note = f'<p class="group-note">{html.escape(section["note"])}</p>' if section.get('note') else ''
+    raw_html = section.get('html') or ''
+    # Dashboard-style sections carry pre-rendered HTML instead of photo
+    # items; they don't show an item count or an (empty) photo grid.
+    count_span = '' if (raw_html and not count) else \
+        f' <span class="group-count">{count} item{"s" if count != 1 else ""}</span>'
     cards = '\n'.join(
         _render_card(item, compare=compare, group_index=index + 1)
         for item in section['items'])
@@ -704,12 +785,12 @@ def _render_section(section, index=0, compare=False):
     {cards}
   </div>
 </section>"""
-    return f"""<section class="group">
-  <h2 class="group-heading">{heading} <span class="group-count">{count} item{'s' if count != 1 else ''}</span></h2>
-  {note}
-  <div class="grid">
+    grid = f"""\n  <div class="grid">
     {cards}
-  </div>
+  </div>""" if cards else ''
+    return f"""<section class="group">
+  <h2 class="group-heading">{heading}{count_span}</h2>
+  {note}{raw_html}{grid}
 </section>"""
 
 
@@ -927,6 +1008,7 @@ class GallerySite:
                 'heading': section['heading'],
                 'note': section.get('note', ''),
                 'items': rendered_items,
+                'html': section.get('html', ''),
             })
         return rendered_sections
 

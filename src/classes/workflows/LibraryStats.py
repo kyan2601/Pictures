@@ -172,10 +172,31 @@ class LibraryStats:
     def _pct(part, whole):
         return f'{100 * part / whole:.0f}%' if whole else '—'
 
-    def _coverage_phrase(self, stats):
-        return ' · '.join(
-            f'{label} {self._pct(stats[key], stats[denom])}'
+    @staticmethod
+    def _pct_value(part, whole):
+        return 100 * part / whole if whole else 0.0
+
+    def _bar_html(self, label, part, whole):
+        pct = self._pct_value(part, whole)
+        level = 'good' if pct >= 90 else 'ok' if pct >= 60 else 'low'
+        return (f'<div class="bar-row"><span class="bar-name">{label}</span>'
+                f'<span class="bar-track"><span class="bar-fill {level}" '
+                f'style="width:{pct:.0f}%"></span></span>'
+                f'<span class="bar-pct">{self._pct(part, whole)}</span></div>')
+
+    def _bars_html(self, stats):
+        rows = ''.join(
+            self._bar_html(label, stats[key], stats[denom])
             for key, denom, label in self._COVERAGE_DIMENSIONS)
+        return f'<div class="bars">{rows}</div>'
+
+    @staticmethod
+    def _cards_html(cards):
+        inner = ''.join(
+            f'<div class="stat-card"><div class="stat-value">{value}</div>'
+            f'<div class="stat-label">{label}</div></div>'
+            for value, label in cards)
+        return f'<div class="dash-cards">{inner}</div>'
 
     def _health_sections(self, per_year):
         totals = {}
@@ -186,20 +207,25 @@ class LibraryStats:
 
         years = sorted(per_year)
         span = f'{years[0]}' if years[0] == years[-1] else f'{years[0]}–{years[-1]}'
-        glance = (f"{totals['files']} files · {totals['pictures']} photos · "
-                  f"{totals['videos']} videos · {_human_size(totals['bytes'])} · "
-                  f"{totals['highlights']} highlights · "
-                  f"{totals['in_events']} in events · {span}")
+        glance_html = self._cards_html([
+            (f"{totals['files']:,}", 'Files'),
+            (f"{totals['pictures']:,}", 'Photos'),
+            (f"{totals['videos']:,}", 'Videos'),
+            (_human_size(totals['bytes']), 'Storage'),
+            (f"{totals['highlights']:,}", 'Highlights'),
+            (f"{totals['in_events']:,}", 'In events'),
+            (span, 'Years'),
+        ]) + self._bars_html(totals)
         sections = [{'heading': 'Library at a glance',
-                     'note': glance + ' · ' + self._coverage_phrase(totals),
-                     'items': []}]
+                     'note': '', 'items': [], 'html': glance_html}]
 
         for year in sorted(per_year, reverse=True):
             s = per_year[year]
-            note = (f"{s['files']} files · {_human_size(s['bytes'])} · "
-                    f"{s['highlights']} highlights · "
-                    + self._coverage_phrase(s))
-            sections.append({'heading': str(year), 'note': note, 'items': []})
+            sub = (f'<p class="dash-sub">{s["files"]:,} files · '
+                   f'{_human_size(s["bytes"])} · {s["highlights"]} '
+                   f'highlight{"s" if s["highlights"] != 1 else ""}</p>')
+            sections.append({'heading': str(year), 'note': '', 'items': [],
+                             'html': sub + self._bars_html(s)})
 
         gap_lines = []
         for key, denom, label in self._COVERAGE_DIMENSIONS:
@@ -216,10 +242,13 @@ class LibraryStats:
                 f'{label}: {total_missing} missing overall — worst in '
                 f'{worst_year} ({worst_missing} of {worst_denom}, '
                 f'{self._pct(worst_missing, worst_denom)} missing)')
+        gaps_html = ''.join(f'<p class="dash-sub">{line}</p>' for line in gap_lines) \
+            if gap_lines else '<p class="dash-sub">No coverage gaps found.</p>'
         sections.append({
             'heading': 'Biggest gaps',
-            'note': '\n'.join(gap_lines) if gap_lines else 'No coverage gaps found.',
+            'note': '',
             'items': [],
+            'html': gaps_html,
         })
         return sections
 
