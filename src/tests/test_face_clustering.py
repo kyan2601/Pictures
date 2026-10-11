@@ -233,3 +233,70 @@ class TestStatusAndReview:
         html = page.read_text()
         assert 'Face clusters' in html
         assert 'faces name --cluster' in html
+
+
+class TestCoverage:
+    def _scan_two_identities_and_a_loner(self, tmp_root, fake_faces):
+        mapping, _ = fake_faces
+        files = _seed(tmp_root, files=[
+            ('a.jpg', '2024:05:01 10:00:00'),
+            ('b.jpg', '2024:05:02 10:00:00'),
+            ('c.jpg', '2024:05:03 10:00:00'),
+            ('d.jpg', '2024:05:04 10:00:00'),
+            ('e.jpg', '2024:05:05 10:00:00'),
+            ('f.jpg', '2024:05:06 10:00:00'),
+        ])
+        mapping[files['a.jpg']] = [G1[0]]
+        mapping[files['b.jpg']] = [G1[1]]
+        mapping[files['c.jpg']] = [G1[2]]
+        mapping[files['d.jpg']] = [G2[0]]
+        mapping[files['e.jpg']] = [G2[1]]
+        mapping[files['f.jpg']] = [_emb(0.0, 0.0, 1.0, 0.0)]  # loner -> unassigned
+        FaceClustering().scan(years=[2024], build_review=False)
+        return files
+
+    def test_no_clusters_returns_none(self, tmp_root, capsys):
+        assert FaceClustering().coverage() is None
+        assert 'No face clusters yet' in capsys.readouterr().out
+
+    def test_counts_named_unnamed_unassigned(self, tmp_root, fake_faces):
+        files = self._scan_two_identities_and_a_loner(tmp_root, fake_faces)
+        assignments = FC._load_clusters()
+        FaceClustering().name_cluster(_cid(assignments, files['a.jpg']), 'Alice')
+
+        summary = FaceClustering().coverage()
+
+        assert summary['total_faces'] == 6
+        assert summary['named_faces'] == 3
+        assert summary['unnamed_faces'] == 2
+        assert summary['unassigned_faces'] == 1
+        assert summary['photos_with_faces'] == 6
+        assert summary['photos_with_named'] == 3
+        assert summary['worklist'] == [_cid(assignments, files['d.jpg'])]
+
+    def test_worklist_line_suggests_name_command(self, tmp_root, fake_faces, capsys):
+        files = self._scan_two_identities_and_a_loner(tmp_root, fake_faces)
+        assignments = FC._load_clusters()
+        g1 = _cid(assignments, files['a.jpg'])
+        g2 = _cid(assignments, files['d.jpg'])
+        capsys.readouterr()
+
+        FaceClustering().coverage()
+
+        out = capsys.readouterr().out
+        assert f'cluster {g2}: 2 face(s) in 2 photo(s)' in out
+        assert f'faces name --cluster {g2}' in out
+        # Ranked by payoff: the 3-face cluster is listed before the 2-face one.
+        assert out.index(f'cluster {g1}:') < out.index(f'cluster {g2}:')
+
+    def test_all_named_reports_no_worklist(self, tmp_root, fake_faces, capsys):
+        files = self._scan_two_identities_and_a_loner(tmp_root, fake_faces)
+        assignments = FC._load_clusters()
+        FaceClustering().name_cluster(_cid(assignments, files['a.jpg']), 'Alice')
+        FaceClustering().name_cluster(_cid(assignments, files['d.jpg']), 'Bob')
+        capsys.readouterr()
+
+        summary = FaceClustering().coverage()
+
+        assert summary['worklist'] == []
+        assert 'Every cluster is named' in capsys.readouterr().out

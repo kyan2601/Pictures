@@ -118,6 +118,10 @@ def _faces_status(args):
     FaceClustering().status()
 
 
+def _faces_coverage(args):
+    FaceClustering().coverage(top=args.top)
+
+
 def _location_enrich(args):
     LocationEnrichment().enrich(years=args.years, dry_run=not args.execute)
 
@@ -286,6 +290,14 @@ def main(argv=None):
 
     faces_sub.add_parser('status', help='Show face index and cluster status.') \
         .set_defaults(func=_faces_status)
+
+    coverage_parser = faces_sub.add_parser(
+        'coverage',
+        help='Show how much of the face universe is named, with a naming worklist.')
+    coverage_parser.add_argument(
+        '--top', type=int, default=15,
+        help='Max unnamed clusters to list (default: 15).')
+    coverage_parser.set_defaults(func=_faces_coverage)
 
     location_parser = subparsers.add_parser(
         'location', help='Offline location enrichment from GPS coordinates.')
