@@ -464,3 +464,23 @@ class TestFaces:
         cli.main(['faces', 'status'])
 
         assert fake.instances[0].calls == [('status', (), {})]
+
+
+class TestLocation:
+    def test_enrich_passes_args_through(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'LocationEnrichment', fake)
+
+        cli.main(['location', 'enrich', '--years', '2024', '2025', '--execute'])
+
+        assert fake.instances[0].calls == [
+            ('enrich', (), {'years': [2024, 2025], 'dry_run': False})]
+
+    def test_enrich_defaults_to_dry_run(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'LocationEnrichment', fake)
+
+        cli.main(['location', 'enrich'])
+
+        assert fake.instances[0].calls == [
+            ('enrich', (), {'years': None, 'dry_run': True})]
