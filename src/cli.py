@@ -126,6 +126,14 @@ def _faces_coverage(args):
     FaceClustering().coverage(top=args.top)
 
 
+def _faces_merge(args):
+    FaceClustering().merge_clusters(args.clusters)
+
+
+def _faces_split(args):
+    FaceClustering().split_cluster(args.cluster, eps=args.eps)
+
+
 def _location_enrich(args):
     LocationEnrichment().enrich(years=args.years, dry_run=not args.execute)
 
@@ -316,6 +324,21 @@ def main(argv=None):
         '--top', type=int, default=15,
         help='Max unnamed clusters to list (default: 15).')
     coverage_parser.set_defaults(func=_faces_coverage)
+
+    merge_parser = faces_sub.add_parser(
+        'merge', help='Merge clusters into the first id listed (same person, split clusters).')
+    merge_parser.add_argument(
+        'clusters', type=int, nargs='+',
+        help='Cluster ids to merge; the first one survives.')
+    merge_parser.set_defaults(func=_faces_merge)
+
+    split_parser = faces_sub.add_parser(
+        'split', help='Split a cluster into two or more at a tighter threshold (two people, one cluster).')
+    split_parser.add_argument('--cluster', type=int, required=True, help='Cluster id to split.')
+    split_parser.add_argument(
+        '--eps', type=float, default=0.35,
+        help='Cosine-distance threshold for the split (default: 0.35, tighter than scan).')
+    split_parser.set_defaults(func=_faces_split)
 
     location_parser = subparsers.add_parser(
         'location', help='Offline location enrichment from GPS coordinates.')
