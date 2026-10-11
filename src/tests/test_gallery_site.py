@@ -192,6 +192,91 @@ class TestAddPage:
             assert max(img.size) <= 480
 
 
+class TestComparePages:
+    def _build_compare_page(self, tmp_root):
+        source_dir = tmp_root / 'source'
+        source_dir.mkdir()
+        _write_jpeg(source_dir / 'a.jpg')
+        _write_jpeg(source_dir / 'b.jpg')
+
+        review_root = tmp_root / 'review'
+        site = GallerySite(str(review_root))
+        return site.add_page(
+            category='duplicate-check',
+            page_id='2022-05',
+            title='Duplicate check — 2022-05',
+            sections=[{
+                'heading': 'Group 1 — Duplicate',
+                'items': [
+                    {'filepath': str(source_dir / 'a.jpg'), 'label': 'Score 24.5',
+                     'tag': 'keep',
+                     'details': ['4032 × 3024', '2022-05-14 09:31', '4.2 MB']},
+                    {'filepath': str(source_dir / 'b.jpg'), 'label': 'Score 18.1',
+                     'tag': 'remove',
+                     'details': ['4032 × 3024', '2022-05-14 09:31', '3.9 MB']},
+                ],
+            }],
+            variant='compare',
+        )
+
+    def test_compare_layout_toolbar_and_details(self, tmp_root):
+        page_path = self._build_compare_page(tmp_root)
+
+        page_html = open(page_path, encoding='utf-8').read()
+        assert '<body class="compare">' in page_html
+        assert 'compare-toolbar' in page_html
+        assert 'id="compare-progress"' in page_html
+        assert 'id="group-1"' in page_html
+        assert 'data-filename="a.jpg"' in page_html
+        assert 'data-group="1"' in page_html
+        assert '4032 × 3024' in page_html
+        assert '2022-05-14 09:31' in page_html
+        assert '4.2 MB' in page_html
+
+    def test_compare_cards_have_decision_controls_and_suggestion(self, tmp_root):
+        page_path = self._build_compare_page(tmp_root)
+
+        page_html = open(page_path, encoding='utf-8').read()
+        assert 'decision-btn' in page_html
+        assert 'data-decision="keep"' in page_html
+        assert 'data-decision="remove"' in page_html
+        assert 'data-decision="unsure"' in page_html
+        # The checker's score-based tag is a hint, not a pre-made decision.
+        assert 'Suggested: KEEP' in page_html
+        assert '<span class="chip keep">KEEP</span>' not in page_html
+
+    def test_compare_script_persists_and_exports_decisions(self, tmp_root):
+        page_path = self._build_compare_page(tmp_root)
+
+        page_html = open(page_path, encoding='utf-8').read()
+        assert 'duplicate-decisions:' in page_html
+        assert 'localStorage' in page_html
+        assert 'PAGE_ID = "2022-05"' in page_html
+        assert "' group '" in page_html  # export line format: "{page} group {n}: ..."
+        assert 'Copy decisions' in page_html
+
+    def test_standard_page_has_no_compare_layer(self, tmp_root):
+        source_dir = tmp_root / 'source'
+        source_dir.mkdir()
+        _write_jpeg(source_dir / 'a.jpg')
+
+        review_root = tmp_root / 'review'
+        site = GallerySite(str(review_root))
+        page_path = site.add_page(
+            category='highlight-reel',
+            page_id='2024',
+            title='Highlights — 2024',
+            sections=[{'heading': 'January',
+                       'items': [{'filepath': str(source_dir / 'a.jpg')}]}],
+        )
+
+        page_html = open(page_path, encoding='utf-8').read()
+        assert '<div class="compare-toolbar">' not in page_html
+        assert 'id="compare-progress"' not in page_html
+        assert 'class="decision-btn keep"' not in page_html
+        assert '<body class="compare">' not in page_html
+
+
 class TestReviews:
     def test_new_page_gets_a_reviews_csv_entry_with_empty_last_reviewed(self, tmp_root):
         source_dir = tmp_root / 'source'

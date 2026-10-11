@@ -1,5 +1,8 @@
 import os
+from datetime import datetime
 from types import SimpleNamespace
+
+from PIL import Image
 
 from src.classes.workflows.DuplicateImageCheck import DuplicateImageCheck
 
@@ -182,3 +185,31 @@ class TestHandleGroups:
         check._handle_groups([], dry_run=False)
 
         assert not (tmp_root / 'backup').exists()
+
+    def test_review_page_uses_compare_layout_with_details(self, tmp_root):
+        month_dir = tmp_root / '2022' / '05'
+        month_dir.mkdir(parents=True)
+        check = DuplicateImageCheck(str(month_dir))
+        a_path, b_path = str(month_dir / 'a.jpg'), str(month_dir / 'b.jpg')
+        # Real JPEGs so GallerySite can thumbnail them; noise makes a.jpg the
+        # larger file (higher quality score) without changing dimensions.
+        Image.effect_noise((100, 100), 100).convert('RGB').save(a_path, 'JPEG')
+        Image.new('RGB', (100, 100), color=(0, 0, 255)).save(b_path, 'JPEG')
+        dt = datetime(2022, 5, 14, 9, 31)
+        check.picture_entries = {
+            a_path: SimpleNamespace(phash='0', dhash='0000000000000000',
+                                    width=100, height=100, dt=dt),
+            b_path: SimpleNamespace(phash='0', dhash='0000000000000001',
+                                    width=100, height=100, dt=dt),
+        }
+
+        check._handle_groups([[a_path, b_path]], dry_run=True)
+
+        pages = list((tmp_root / 'review' / 'duplicate-check').glob('*.html'))
+        assert len(pages) == 1
+        page_html = pages[0].read_text(encoding='utf-8')
+        assert '<div class="compare-toolbar">' in page_html
+        assert 'id="compare-progress"' in page_html
+        assert '100 × 100' in page_html
+        assert '2022-05-14 09:31' in page_html
+        assert 'Suggested:' in page_html
