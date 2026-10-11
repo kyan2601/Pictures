@@ -121,6 +121,9 @@ def _faces_status(args):
 
 def _people_pages(args):
     PeoplePages().run(regenerate=args.regenerate, min_photos=args.min_photos)
+    
+def _faces_coverage(args):
+    FaceClustering().coverage(top=args.top)
 
 
 def _location_enrich(args):
@@ -305,6 +308,14 @@ def main(argv=None):
         '--min-photos', type=int, default=3,
         help='Minimum photos for a person to get a page (default: 3).')
     pages_parser.set_defaults(func=_people_pages)
+    
+    coverage_parser = faces_sub.add_parser(
+        'coverage',
+        help='Show how much of the face universe is named, with a naming worklist.')
+    coverage_parser.add_argument(
+        '--top', type=int, default=15,
+        help='Max unnamed clusters to list (default: 15).')
+    coverage_parser.set_defaults(func=_faces_coverage)
 
     location_parser = subparsers.add_parser(
         'location', help='Offline location enrichment from GPS coordinates.')

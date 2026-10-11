@@ -485,6 +485,22 @@ class TestFaces:
 
         assert fake.instances[0].calls == [('status', (), {})]
 
+    def test_coverage(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'coverage'])
+
+        assert fake.instances[0].calls == [('coverage', (), {'top': 15})]
+
+    def test_coverage_top(self, monkeypatch):
+        fake = _fresh_faces_fake()
+        monkeypatch.setattr(cli, 'FaceClustering', fake)
+
+        cli.main(['faces', 'coverage', '--top', '5'])
+
+        assert fake.instances[0].calls == [('coverage', (), {'top': 5})]
+
 
 class TestPeople:
     def test_pages_defaults(self, monkeypatch):
