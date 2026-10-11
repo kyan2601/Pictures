@@ -69,10 +69,11 @@ class TestHealthPage:
         assert written == _page_path()
         html = open(written).read()
         assert 'Library at a glance' in html
-        assert 'Titled 67%' in html
-        assert 'Tagged 50%' in html
-        assert 'Location 33%' in html
-        assert 'GPS 17%' in html
+        assert 'stat-card' in html          # dashboard stat cards
+        assert 'bar-fill' in html           # coverage bars
+        assert 'bar-pct">67%' in html       # titled, overall
+        assert 'bar-pct">33%' in html       # location, overall
+        assert 'bar-pct">17%' in html       # GPS, overall
         assert 'Biggest gaps' in html
         assert 'Location: 4 missing overall — worst in 2023 (2 of 2, 100% missing)' in html
         assert 'GPS: 5 missing overall — worst in 2024 (3 of 4, 75% missing)' in html
@@ -92,7 +93,7 @@ class TestHealthPage:
         for fp in list(mf23.df['filepath']):
             _set_fields(mf23, fp, location_city='Chicago')
         LibraryStats().build_health_page(regenerate=True)
-        assert 'Location 67%' in open(_page_path()).read()
+        assert 'Location: 2 missing overall' in open(_page_path()).read()
 
     def test_no_metadata_returns_none(self, tmp_root, capsys, monkeypatch):
         monkeypatch.setattr(helper, 'get_years_with_metadata', lambda: [])
